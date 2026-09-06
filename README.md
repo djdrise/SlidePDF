@@ -1,5 +1,9 @@
 # PodiumPDF
 
+[![Последний релиз](https://img.shields.io/github/v/release/djdrise/PodiumPDF?label=релиз)](https://github.com/djdrise/PodiumPDF/releases/latest)
+[![Проверка](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml/badge.svg)](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml)
+[![Лицензия: GPL-3.0](https://img.shields.io/badge/лицензия-GPL--3.0-blue)](LICENSE)
+
 Мультиплатформенный просмотрщик PDF для докладов на конференциях: слайд уходит
 на проектор/внешний экран, а на ноутбуке остаётся режим лектора с порядком
 слайдов, следующим слайдом и текстом слайда. Несколько презентаций
