@@ -76,7 +76,14 @@
       }
     ],
     "asar": false,
-    "icon": "assets/icon.png"
+    "icon": "assets/icon.png",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "nsis": {
+      "artifactName": "${productName}-${version}-Setup-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
+    }
   },
   "engines": {
     "node": ">=20"

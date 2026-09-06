@@ -63,15 +63,26 @@ jobs:
         run: |
           set -e
           find dist -type f | sort
+          # Заметки — отдельным файлом через heredoc: YAML срезает отступ блока,
+          # и текст доходит без ведущих пробелов. Вписанный в аргумент --notes
+          # он бы сохранил отступы, а Markdown отрендерил бы список как код.
+          cat > notes.md <<'MD'
+          Установщики собраны на GitHub Actions под каждую ОС.
+
+          * **macOS** — `.dmg`: `arm64` для Apple Silicon, `x64` для Intel
+          * **Windows** — `Setup.exe` (установщик) и портативный `.exe`
+          * **Linux** — `.AppImage` и `.deb`
+
+          Сборки не подписаны цифровым сертификатом. На macOS первый запуск — через
+          правый клик по программе и «Открыть»; Windows SmartScreen может попросить
+          «Подробнее» → «Выполнить в любом случае»; `.AppImage` нужно сделать
+          исполняемым: `chmod +x PodiumPDF-*.AppImage`.
+          MD
+          # Список файлов только массивом: неэкранированный $(find) разбивает
+          # имена с пробелами на отдельные аргументы.
+          mapfile -t files < <(find dist -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \) | sort)
+          printf 'к релизу: %s\n' "${files[@]}"
           gh release create "${{ github.ref_name }}" \
             --title "PodiumPDF ${{ github.ref_name }}" \
-            --notes "Установщики собраны на GitHub Actions под каждую ОС.
-
-          * **macOS** — \`.dmg\` (arm64 для Apple Silicon, x64 для Intel)
-          * **Windows** — \`Setup.exe\` (установщик) и портативный \`.exe\`
-          * **Linux** — \`.AppImage\` и \`.deb\`
-
-          Сборки не подписаны цифровым сертификатом. На macOS первый запуск —
-          через правый клик по программе и «Открыть»; Windows SmartScreen может
-          попросить «Подробнее» → «Выполнить в любом случае»." \
-            $(find dist -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \))
+            --notes-file notes.md \
+            "${files[@]}"
