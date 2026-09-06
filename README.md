@@ -10,7 +10,22 @@ macOS · Windows · Linux (Electron + pdf.js).
 
 ![Режим лектора: текущий слайд, следующий, текст слайда и лента миниатюр](docs/screenshot.png)
 
-## Запуск
+## Установка
+
+Готовые сборки — на странице
+[Releases](https://github.com/djdrise/PodiumPDF/releases): `.dmg` для macOS
+(отдельно Apple Silicon и Intel), `.exe` для Windows (установщик и портативный)
+и `.AppImage` / `.deb` для Linux.
+
+Сборки не подписаны цифровым сертификатом, поэтому при первом запуске:
+
+* **macOS** — правый клик по программе → «Открыть», затем подтвердить. Обычный
+  двойной клик Gatekeeper заблокирует.
+* **Windows** — SmartScreen покажет предупреждение: «Подробнее» → «Выполнить
+  в любом случае».
+* **Linux** — `.AppImage` нужно сделать исполняемым: `chmod +x PodiumPDF-*.AppImage`.
+
+## Запуск из исходников
 
 Нужен Node.js 20 или новее.
 
@@ -42,8 +57,14 @@ npm run dist:win      # nsis + portable
 npm run dist:linux    # AppImage + deb
 ```
 
-electron-builder собирает под текущую ОС; кросс-сборка под Windows с macOS
-требует wine, под macOS собирать нужно на macOS.
+electron-builder собирает только под текущую ОС: кросс-сборка под Windows
+требует wine, а Linux-сборка на macOS не поддерживается. Поэтому релизы
+собираются на GitHub Actions — по одной задаче на каждую ОС, workflow
+[`release.yml`](.github/workflows/release.yml) срабатывает на тег `v*`:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
 
 ## Как работают экраны
 

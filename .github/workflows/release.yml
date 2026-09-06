@@ -1,0 +1,77 @@
+name: release
+
+# Релиз собирается по тегу: git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Сборка (${{ matrix.artifact }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: mac
+            args: --mac --x64 --arm64
+          - os: windows-latest
+            artifact: win
+            args: --win --x64
+          - os: ubuntu-latest
+            artifact: linux
+            args: --linux --x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Собрать установщики
+        run: npx electron-builder ${{ matrix.args }} --publish never
+        env:
+          # Сертификата разработчика у проекта нет — сборка не подписывается.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+
+  release:
+    name: Публикация релиза
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Создать релиз и приложить файлы
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          find dist -type f | sort
+          gh release create "${{ github.ref_name }}" \
+            --title "PodiumPDF ${{ github.ref_name }}" \
+            --notes "Установщики собраны на GitHub Actions под каждую ОС.
+
+          * **macOS** — \`.dmg\` (arm64 для Apple Silicon, x64 для Intel)
+          * **Windows** — \`Setup.exe\` (установщик) и портативный \`.exe\`
+          * **Linux** — \`.AppImage\` и \`.deb\`
+
+          Сборки не подписаны цифровым сертификатом. На macOS первый запуск —
+          через правый клик по программе и «Открыть»; Windows SmartScreen может
+          попросить «Подробнее» → «Выполнить в любом случае»." \
+            $(find dist -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \))
