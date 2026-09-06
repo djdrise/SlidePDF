@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Мультиплатформенный PDF-просмотрщик для докладов на конференциях с режимом лектора",
   "main": "src/main/main.js",
-  "author": "Ilya Pautov",
+  "author": {
+    "name": "Ilya Pautov",
+    "email": "djdrise@gmail.com"
+  },
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
