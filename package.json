@@ -1,0 +1,81 @@
+{
+  "name": "podiumpdf",
+  "version": "0.1.0",
+  "description": "Мультиплатформенный PDF-просмотрщик для докладов на конференциях с режимом лектора",
+  "main": "src/main/main.js",
+  "author": "Ilya Pautov",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djdrise/PodiumPDF.git"
+  },
+  "bugs": {
+    "url": "https://github.com/djdrise/PodiumPDF/issues"
+  },
+  "homepage": "https://github.com/djdrise/PodiumPDF#readme",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "dev": "node scripts/start.js --dev",
+    "check": "node scripts/check.js",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "icon": "node scripts/make-icon.js"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^5.4.149"
+  },
+  "devDependencies": {
+    "electron": "^38.2.2",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "dev.pautov.podiumpdf",
+    "productName": "PodiumPDF",
+    "files": [
+      "assets/**/*",
+      "src/**/*",
+      "scripts/**/*",
+      "node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+      "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "node_modules/pdfjs-dist/cmaps/**/*",
+      "node_modules/pdfjs-dist/standard_fonts/**/*",
+      "node_modules/pdfjs-dist/wasm/**/*",
+      "node_modules/pdfjs-dist/iccs/**/*",
+      "node_modules/pdfjs-dist/package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    },
+    "fileAssociations": [
+      {
+        "ext": "pdf",
+        "name": "PDF",
+        "role": "Viewer"
+      }
+    ],
+    "asar": false,
+    "icon": "assets/icon.png"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
