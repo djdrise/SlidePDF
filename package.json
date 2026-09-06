@@ -1,7 +1,7 @@
 {
   "name": "podiumpdf",
   "version": "0.1.0",
-  "description": "Мультиплатформенный PDF-просмотрщик для докладов на конференциях с режимом лектора",
+  "description": "Cross-platform PDF viewer for conference talks: projector output and a presenter view",
   "main": "src/main/main.js",
   "author": {
     "name": "Ilya Pautov",

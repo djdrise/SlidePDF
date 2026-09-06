@@ -1,58 +1,59 @@
 # PodiumPDF
 
-[![Последний релиз](https://img.shields.io/github/v/release/djdrise/PodiumPDF?label=релиз)](https://github.com/djdrise/PodiumPDF/releases/latest)
-[![Проверка](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml/badge.svg)](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml)
-[![Лицензия: GPL-3.0](https://img.shields.io/badge/лицензия-GPL--3.0-blue)](LICENSE)
+**English** · [Русский](README.ru.md)
 
-Мультиплатформенный просмотрщик PDF для докладов на конференциях: слайд уходит
-на проектор/внешний экран, а на ноутбуке остаётся режим лектора с порядком
-слайдов, следующим слайдом и текстом слайда. Несколько презентаций
-открываются вкладками. Интерфейс светлый и намеренно простой.
+[![Latest release](https://img.shields.io/github/v/release/djdrise/PodiumPDF?label=release)](https://github.com/djdrise/PodiumPDF/releases/latest)
+[![Check](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml/badge.svg)](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+
+A cross-platform PDF viewer for conference talks: the slide goes to the
+projector, while your laptop keeps a presenter view with the slide order, the
+next slide and the text of the current one. Several decks open as tabs. The
+interface is light and deliberately plain.
 
 macOS · Windows · Linux (Electron + pdf.js).
 
-![Режим лектора: текущий слайд, следующий, текст слайда и лента миниатюр](docs/screenshot.png)
+![Presenter view: current slide, next slide, slide text and the thumbnail strip](docs/screenshot.png)
 
-## Установка
+## Install
 
-Готовые сборки — на странице
-[Releases](https://github.com/djdrise/PodiumPDF/releases): `.dmg` для macOS
-(отдельно Apple Silicon и Intel), `.exe` для Windows (установщик и портативный)
-и `.AppImage` / `.deb` для Linux.
+Prebuilt installers are on the
+[Releases](https://github.com/djdrise/PodiumPDF/releases) page: `.dmg` for macOS
+(Apple Silicon and Intel separately), `.exe` for Windows (installer and
+portable), `.AppImage` and `.deb` for Linux.
 
-Сборки не подписаны цифровым сертификатом, поэтому при первом запуске:
+The builds are not code-signed, so the first launch needs a nudge:
 
-* **macOS** — правый клик по программе → «Открыть», затем подтвердить. Обычный
-  двойной клик Gatekeeper заблокирует.
-* **Windows** — SmartScreen покажет предупреждение: «Подробнее» → «Выполнить
-  в любом случае».
-* **Linux** — `.AppImage` нужно сделать исполняемым: `chmod +x PodiumPDF-*.AppImage`.
+* **macOS** — right-click the app → “Open”, then confirm. A plain double-click
+  is blocked by Gatekeeper.
+* **Windows** — SmartScreen warns: “More info” → “Run anyway”.
+* **Linux** — make the AppImage executable: `chmod +x PodiumPDF-*.AppImage`.
 
-## Запуск из исходников
+## Running from source
 
-Нужен Node.js 20 или новее.
+Node.js 20 or newer.
 
 ```bash
 npm install
-npm start                 # или: npm start -- путь/к/презентации.pdf
-npm run dev               # то же самое, плюс лог renderer-процессов в терминал
+npm start                 # or: npm start -- path/to/deck.pdf
+npm run dev               # same, plus renderer logs in the terminal
 ```
 
-> `npm start` идёт через `scripts/start.js`: терминал VS Code выставляет
-> `ELECTRON_RUN_AS_NODE=1`, с которой Electron стартует как обычный Node и
-> приложение падает. Лаунчер чистит эту переменную.
+> `npm start` goes through `scripts/start.js`. The VS Code terminal exports
+> `ELECTRON_RUN_AS_NODE=1`, and with it the Electron binary starts as plain
+> Node and the app crashes. The launcher clears that variable.
 
-## Проверка
+## Checks
 
 ```bash
-npm run check     # синтаксическая проверка всех исходников
+npm run check     # syntax check across all sources
 ```
 
-Тестов в проекте нет: почти весь код — это работа с окнами, экранами и
-отрисовкой, которую осмысленно проверять только запуском. `npm run check`
-ловит опечатки до старта приложения, его же гоняет GitHub Actions.
+There are no tests: nearly all of the code is window, display and rendering
+work that only makes sense to verify by running it. `npm run check` catches
+typos before startup, and GitHub Actions runs the same command.
 
-## Сборка установщиков
+## Building installers
 
 ```bash
 npm run dist:mac      # dmg + zip
@@ -60,123 +61,126 @@ npm run dist:win      # nsis + portable
 npm run dist:linux    # AppImage + deb
 ```
 
-electron-builder собирает только под текущую ОС: кросс-сборка под Windows
-требует wine, а Linux-сборка на macOS не поддерживается. Поэтому релизы
-собираются на GitHub Actions — по одной задаче на каждую ОС, workflow
-[`release.yml`](.github/workflows/release.yml) срабатывает на тег `v*`:
+electron-builder only builds for the host OS: cross-building for Windows needs
+wine, and Linux builds are not supported on macOS. Releases are therefore built
+on GitHub Actions — one job per OS. The
+[`release.yml`](.github/workflows/release.yml) workflow fires on a `v*` tag:
 
 ```bash
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-## Как работают экраны
+## How the screens work
 
-При старте приложение опрашивает список дисплеев:
+On startup the app looks at the list of displays:
 
-* **Есть внешний экран** — окно зрителей само разворачивается на него во весь
-  экран, окно лектора остаётся на основном.
-* **Экран один** — окно зрителей открывается обычным окном-превью, чтобы можно
-  было готовиться к докладу заранее.
-* Проектор подключили или отключили прямо во время доклада — `display-added` /
-  `display-removed` пересобирают раскладку на лету.
-* Автоматику можно перебить вручную: шестерёнка в шапке открывает настройки со
-  списком экранов, где выбирается тот, на который уходит слайд. После ручного
-  выбора автоматика экран показа больше не переназначает — до тех пор, пока
-  выбранный монитор не отключат.
+* **An external screen is present** — the audience window goes full screen on
+  it by itself, the presenter view stays on the built-in display.
+* **A single screen** — the audience window opens as an ordinary preview
+  window, so you can prepare before the talk.
+* A projector plugged in or unplugged mid-talk — `display-added` /
+  `display-removed` rebuild the layout on the fly.
+* The automation can be overridden: the gear in the header opens settings with
+  a list of screens, where you pick the one the slide goes to. After a manual
+  choice the automation stops reassigning the show screen — until that monitor
+  is disconnected.
 
-Оба окна рендерят PDF независимо из одних и тех же байтов, а состояние — текущий
-слайд, чёрный экран, активная вкладка — живёт в main-процессе и рассылается
-обоим. Окно зрителей не может «отстать» от окна лектора.
+Both windows render the PDF independently from the same bytes, while the state —
+current slide, black screen, active tab — lives in the main process and is
+broadcast to both. The audience window cannot fall behind the presenter view.
 
-## Показ
+## The show
 
-Запускается и завершается по <kbd>F5</kbd>. Окно зрителей создаётся без рамки
-(`frame: false`), поэтому на экране нет ничего, кроме слайда; в режиме превью
-(когда экран один) оно вместо системной рамки получает собственную
-полоску-заголовок, за которую его можно таскать.
+Starts and ends with <kbd>F5</kbd>. The audience window is created without a
+frame (`frame: false`), so nothing but the slide is on screen; in preview mode
+(single display) it gets its own title strip instead of the system frame, so it
+can still be dragged.
 
-Показ появляется сразу готовым. Пока меняется геометрия окна, оно держится
-прозрачным и показывается только после того, как renderer подтвердил, что
-перерисовал слайд под новый размер. Иначе было бы видно, как окно растягивается
-из превью, а слайд догоняет полный экран уже на глазах у зала. На macOS показ
-разворачивается через `simpleFullScreen`, чтобы не создавался отдельный Space
-с анимацией перехода.
+The show appears already finished. While the window geometry changes it is kept
+transparent, and it is only revealed once the renderer confirms it has redrawn
+the slide at the new size. Otherwise the audience would watch the window stretch
+out of its preview size while the slide caught up. On macOS the show uses
+`simpleFullScreen` so that no separate Space is created with its transition
+animation.
 
-Фокус сразу переходит на полноэкранное окно, так что кликер и клавиши бьют
-в показ. Курсор мыши в нём прячется — и мгновенно на старте, и через две
-секунды после того, как мышь перестали двигать.
+Focus moves to the full-screen window immediately, so a presenter remote and the
+keyboard act on the show. The mouse cursor hides there — instantly on start, and
+again two seconds after the mouse stops moving.
 
-## Режим лектора
+## Presenter view
 
-* Несколько презентаций открываются вкладками: <kbd>Ctrl</kbd>+<kbd>Tab</kbd>
-  вперёд, <kbd>Shift</kbd>+<kbd>Tab</kbd> назад, крестик на вкладке или
-  <kbd>Cmd/Ctrl</kbd>+<kbd>W</kbd> — закрыть. Каждая вкладка помнит свою
-  страницу; в диалоге и перетаскиванием можно открыть сразу несколько файлов.
-* Крупно — текущий слайд, рядом — следующий.
-* **Порядок слайдов**: лента миниатюр внизу и полноэкранная сетка всех слайдов
-  (<kbd>G</kbd>). В сетке стрелки двигают выделение, не трогая экран зрителей,
-  переход происходит по <kbd>Enter</kbd> или клику.
-* Текст текущего слайда — как подсказка вместо заметок.
-* Счётчик слайдов и индикатор состояния экранов — оба появляются только
-  тогда, когда им есть что показать.
+* Several decks open as tabs: <kbd>Ctrl</kbd>+<kbd>Tab</kbd> forward,
+  <kbd>Shift</kbd>+<kbd>Tab</kbd> back, the cross on a tab or
+  <kbd>Cmd/Ctrl</kbd>+<kbd>W</kbd> to close. Each tab remembers its own page;
+  the open dialog and drag-and-drop both accept several files at once.
+* The current slide is large, the next one sits beside it.
+* **Slide order**: a thumbnail strip at the bottom and a full-screen grid of
+  every slide (<kbd>G</kbd>). In the grid the arrows move the selection without
+  touching the audience screen; <kbd>Enter</kbd> or a click jumps there.
+* The text of the current slide stands in for speaker notes.
+* The slide counter and the screen indicator both appear only when they have
+  something to say.
 
-## Клавиши
+## Keys
 
-| Клавиша | Действие |
+| Key | Action |
 | --- | --- |
-| <kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> <kbd>PageDown</kbd> | следующий слайд |
-| <kbd>←</kbd> <kbd>↑</kbd> <kbd>PageUp</kbd> <kbd>Backspace</kbd> | предыдущий слайд |
-| <kbd>Home</kbd> / <kbd>End</kbd> | первый / последний слайд |
-| цифры, затем <kbd>Enter</kbd> | перейти к слайду по номеру |
-| <kbd>G</kbd> | сетка всех слайдов |
-| <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | следующая / предыдущая вкладка |
-| <kbd>B</kbd> | чёрный экран у зрителей |
-| <kbd>F5</kbd> | начать / завершить показ |
-| <kbd>O</kbd> | открыть PDF |
-| <kbd>Esc</kbd> | закрыть сетку, снять чёрный экран, завершить показ |
+| <kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> <kbd>PageDown</kbd> | next slide |
+| <kbd>←</kbd> <kbd>↑</kbd> <kbd>PageUp</kbd> <kbd>Backspace</kbd> | previous slide |
+| <kbd>Home</kbd> / <kbd>End</kbd> | first / last slide |
+| digits, then <kbd>Enter</kbd> | jump to a slide by number |
+| <kbd>G</kbd> | grid of all slides |
+| <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | next / previous tab |
+| <kbd>B</kbd> | black out the audience screen |
+| <kbd>F5</kbd> | start / end the show |
+| <kbd>O</kbd> | open a PDF |
+| <kbd>Esc</kbd> | close the grid, clear the black screen, end the show |
 
-Клавиши слушают оба окна, поэтому презентер-кликер (он шлёт PageUp/PageDown)
-работает независимо от того, какое окно в фокусе. Раскладка учитывает и русские
-буквы на тех же клавишах.
+Both windows listen for keys, so a presenter remote (which sends
+PageUp/PageDown) works no matter which window has focus. The layout also
+recognises the Cyrillic letters on the same physical keys.
 
-## Логотип
+## Logo
 
-Знак — трибуна докладчика: наклонная столешница на тумбе. Синяя доска повторяет
-акцентный цвет интерфейса.
-
-```
-assets/logo.svg   знак для интерфейса (двухцветный, на светлом фоне)
-assets/icon.svg   иконка приложения — белый знак на синей плитке
-assets/icon.png   1024×1024, из неё electron-builder делает .icns и .ico
-```
-
-`npm run icon` пересобирает PNG из SVG силами Chromium: сторонних конвертеров
-SVG в системе может не быть, а Electron уже установлен. Скрипт самозапускается —
-под обычным Node он перезапускает себя в Electron.
-
-## Структура
+The mark is a lectern: a slanted top on a pedestal. The blue board repeats the
+accent colour of the interface.
 
 ```
-src/main/main.js        дисплеи, окна, состояние показа, меню
-src/preload/preload.js  contextBridge: команды, подписки, путь файла из drag&drop
+assets/logo.svg   the mark for the interface (two-tone, on a light background)
+assets/icon.svg   the app icon — a white mark on a blue tile
+assets/icon.png   1024×1024, electron-builder turns it into .icns and .ico
+```
+
+`npm run icon` rebuilds the PNG from the SVG using Chromium: a standalone SVG
+converter may be missing from the system, while Electron is already installed.
+The script bootstraps itself — under plain Node it re-spawns itself in Electron.
+
+## Layout
+
+```
+src/main/main.js        displays, windows, show state, menu
+src/preload/preload.js  contextBridge: commands, subscriptions, drag-and-drop paths
 src/renderer/
-  presenter.*           режим лектора
-  audience.*            экран зрителей
-  lib/pdfview.js        обёртка pdf.js: документ, слайд «по размеру», миниатюры
-  lib/keys.js           общая раскладка клавиш и drag&drop
-scripts/start.js        лаунчер, чистящий ELECTRON_RUN_AS_NODE
-scripts/make-icon.js    сборка assets/icon.png из assets/icon.svg
-scripts/check.js        синтаксическая проверка исходников
-assets/                 логотип и иконка приложения
-docs/                   скриншот для README
+  presenter.*           presenter view
+  audience.*            audience screen
+  lib/pdfview.js        pdf.js wrapper: document, fitted slide, thumbnails
+  lib/keys.js           shared key bindings and drag-and-drop
+scripts/start.js        launcher that clears ELECTRON_RUN_AS_NODE
+scripts/make-icon.js    builds assets/icon.png from assets/icon.svg
+scripts/check.js        syntax check across the sources
+assets/                 logo and application icon
+docs/                   screenshot for the README
 ```
 
-Окна изолированы: `contextIsolation: true`, `nodeIntegration: false`, CSP
-запрещает любые сетевые запросы — PDF с внешними ссылками ничего не подгрузит.
+The windows are isolated: `contextIsolation: true`, `nodeIntegration: false`,
+and the CSP forbids every network request — a PDF with external links loads
+nothing.
 
-## Лицензия
+> Source comments are written in Russian.
 
-GNU General Public License v3.0 или новее — полный текст в [LICENSE](LICENSE).
+## License
+
+GNU General Public License v3.0 or later — full text in [LICENSE](LICENSE).
 
 > PodiumPDF is free software: you can redistribute it and/or modify it under
 > the terms of the GNU General Public License as published by the Free Software
@@ -185,5 +189,5 @@ GNU General Public License v3.0 или новее — полный текст в
 > WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 > A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
-Сторонние компоненты: [pdf.js](https://github.com/mozilla/pdf.js) (Apache-2.0)
-и [Electron](https://github.com/electron/electron) (MIT).
+Third-party components: [pdf.js](https://github.com/mozilla/pdf.js) (Apache-2.0)
+and [Electron](https://github.com/electron/electron) (MIT).
