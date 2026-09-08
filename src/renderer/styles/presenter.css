@@ -7,8 +7,10 @@
   --text: #1b1e23;
   --dim: #6b7280;
   --dim-soft: #9aa1ab;
-  --accent: #2563eb;
-  --accent-soft: #e8f0fe;
+  --accent: #d1352a;
+  --accent-hover: #b82d23;
+  --accent-soft: #fdeae6;
+  --accent-press: #fbd9d1;
   --warn: #b45309;
   --warn-bg: #fef3c7;
 }
@@ -55,7 +57,7 @@ body {
   border-right: 1px solid var(--line-soft);
 }
 .icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
-.icon-btn:active { background: #dbe7fd; }
+.icon-btn:active { background: var(--accent-press); }
 
 .tabs {
   flex: 1 1 auto;
@@ -140,7 +142,7 @@ button.primary {
   font-weight: 500;
   cursor: pointer;
 }
-button.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 button.primary:disabled {
   background: var(--line);
   border-color: var(--line);
@@ -274,7 +276,7 @@ button.ghost:hover { color: var(--accent); border-color: var(--accent); }
   position: fixed;
   top: 42px; left: 0; right: 0; bottom: 0;
   z-index: 10;
-  background: var(--bg);
+  background: linear-gradient(160deg, #ffe7de 0%, #fff6f3 45%, #ffffff 100%);
   display: grid;
   place-content: center;
   justify-items: center;
