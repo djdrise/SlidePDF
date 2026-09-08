@@ -92,11 +92,13 @@ export class SlideView {
     await this.show(this.pageNum, { force: true });
     // ResizeObserver мог перебить наш рендер своим — дожидаемся и его.
     for (let i = 0; i < 5 && this.task; i++) {
+      const pending = this.task;
       try {
-        await this.task.promise;
+        await pending.promise;
       } catch {
         /* отменён более свежим рендером */
       }
+      if (this.task === pending) break; // задача не сменилась — ждать больше нечего
     }
   }
 
@@ -134,14 +136,22 @@ export class SlideView {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, target.width, target.height);
 
-    this.task = page.render({ canvas: target, canvasContext: ctx, viewport });
+    const task = page.render({ canvas: target, canvasContext: ctx, viewport });
+    this.task = task;
     try {
-      await this.task.promise;
+      await task.promise;
     } catch (err) {
-      if (err?.name !== 'RenderingCancelledException') throw err;
+      if (err?.name !== 'RenderingCancelledException') {
+        // Одна страница не отрисовалась — приложение остаётся рабочим, а вот
+        // проброс наверх никто не ловит и он оседает unhandled rejection.
+        console.error(`не удалось отрисовать страницу ${n}:`, err);
+      }
       return;
     } finally {
-      this.task = null;
+      // Сбрасываем только свою задачу: более свежий рендер уже записал сюда
+      // свою, и обнуление вслепую лишало бы его возможности быть отменённым
+      // и обманывало бы redrawNow, будто рисовать больше нечего.
+      if (this.task === task) this.task = null;
       page.cleanup();
     }
     if (my !== this.seq) return;

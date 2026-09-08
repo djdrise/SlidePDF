@@ -15,20 +15,25 @@ export function bindKeys(onLocal) {
   let digits = '';
   let digitsTimer = null;
 
-  const flushDigits = () => {
-    if (digits) {
-      window.deck.cmd('goto', { page: Number(digits) });
-      digits = '';
-    }
+  const resetDigits = () => {
+    digits = '';
     clearTimeout(digitsTimer);
+  };
+
+  const flushDigits = () => {
+    const typed = digits;
+    resetDigits();
+    if (typed) window.deck.cmd('goto', { page: Number(typed) });
   };
 
   window.addEventListener('keydown', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
 
-    // Переключение вкладок — до отсечки по модификаторам.
-    if (e.key === 'Tab') {
+    // Переключение вкладок — до отсечки по модификаторам, иначе Ctrl+Tab
+    // отсеклась бы вместе с остальными сочетаниями. Голый Tab не трогаем:
+    // он должен ходить по кнопкам, да и меню обещает именно Ctrl+Tab.
+    if (e.key === 'Tab' && (e.ctrlKey || e.shiftKey)) {
       window.deck.cmd(e.shiftKey ? 'tab:prev' : 'tab:next');
       e.preventDefault();
       return;
@@ -37,6 +42,9 @@ export function bindKeys(onLocal) {
 
     const k = e.key;
     if (onLocal && onLocal(k, e)) {
+      // Клавишу забрал обработчик окна — набор номера слайда прерван, иначе
+      // недобранные цифры сработают таймером уже после перехода.
+      resetDigits();
       e.preventDefault();
       return;
     }
@@ -55,8 +63,11 @@ export function bindKeys(onLocal) {
       return;
     }
     if (k === 'Escape' && digits) {
-      digits = '';
-      clearTimeout(digitsTimer);
+      // Esc отменяет набор номера — и только его. Без return он проваливался
+      // ниже и завершал показ прямо посреди доклада.
+      resetDigits();
+      e.preventDefault();
+      return;
     }
 
     if (NEXT.has(k)) window.deck.cmd('next');

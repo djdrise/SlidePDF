@@ -3,6 +3,7 @@
 const { app, BrowserWindow, ipcMain, dialog, screen, Menu, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const { clampPage, nextTabId, tabAfterClose, chooseLayout } = require('./lib/deck');
 
 const IS_MAC = process.platform === 'darwin';
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
@@ -86,13 +87,10 @@ function refreshDisplays() {
 
 /** Раскладка по умолчанию: лектор на основном, зрители на внешнем. */
 function defaultDisplayLayout() {
-  const all = screen.getAllDisplays();
-  const primary = screen.getPrimaryDisplay();
-  const external = all.find((d) => d.id !== primary.id);
-  return {
-    presenterDisplayId: primary.id,
-    audienceDisplayId: external ? external.id : primary.id,
-  };
+  return chooseLayout(
+    screen.getAllDisplays().map((d) => d.id),
+    screen.getPrimaryDisplay().id,
+  );
 }
 
 /**
@@ -100,7 +98,10 @@ function defaultDisplayLayout() {
  * Всё время смены геометрии окно держится прозрачным, поэтому ни растягивание
  * рамки, ни «догоняющий» размер слайда наружу не видны.
  */
-async function revealAudience(win) {
+/** Счётчик запусков показа: по нему отложенное проявление узнаёт, что его отменили. */
+let showEpoch = 0;
+
+async function revealAudience(win, epoch) {
   const { width, height } = win.getBounds();
   try {
     await Promise.race([
@@ -115,6 +116,9 @@ async function revealAudience(win) {
     /* окно закрылось или скрипт недоступен — показываем как есть */
   }
   if (!win || win.isDestroyed()) return;
+  // Показ могли завершить, пока мы ждали отрисовку: тогда окно уже спрятано,
+  // и проявлять его, да ещё забирать фокус у лектора, точно не надо.
+  if (epoch !== showEpoch) return;
   win.setOpacity(1);
   win.moveTop();
   win.focus();
@@ -122,6 +126,7 @@ async function revealAudience(win) {
 
 function enterPresentationFullscreen(win, display) {
   if (!win || win.isDestroyed() || !display) return;
+  showEpoch += 1;
 
   // Состояние — раньше геометрии: renderer должен успеть убрать полоску-заголовок
   // и перерисовать слайд под полный экран, пока окно ещё невидимо.
@@ -142,11 +147,12 @@ function enterPresentationFullscreen(win, display) {
   win.setAlwaysOnTop(true, 'screen-saver');
 
   // Фокус сразу на полноэкранном окне: кликер и клавиши бьют в показ.
-  revealAudience(win);
+  revealAudience(win, showEpoch);
 }
 
 function exitPresentationFullscreen(win, display) {
   if (!win || win.isDestroyed()) return;
+  showEpoch += 1;
   state.audienceFullscreen = false;
   broadcast();
 
@@ -344,8 +350,20 @@ async function openPath(filePath) {
   if (!filePath) return;
   const full = path.resolve(filePath);
 
+  // Отпечаток файла — том и inode. Сравнивать пути строками нельзя: на macOS и
+  // Windows файловая система нечувствительна к регистру, и «Deck.pdf» открылся
+  // бы второй вкладкой того же файла. Заодно так распознаются симлинки.
+  let key = null;
+  try {
+    const stats = await fs.stat(full);
+    key = `${stats.dev}:${stats.ino}`;
+  } catch (err) {
+    dialog.showErrorBox('Не удалось открыть файл', `${full}\n\n${err.message}`);
+    return;
+  }
+
   // Файл уже открыт — просто переключаемся на его вкладку.
-  const existing = state.docs.find((d) => d.path === full);
+  const existing = state.docs.find((d) => (d.key ? d.key === key : d.path === full));
   if (existing) {
     state.activeId = existing.id;
     state.blank = 'none';
@@ -353,16 +371,10 @@ async function openPath(filePath) {
     return;
   }
 
-  try {
-    await fs.access(full);
-  } catch (err) {
-    dialog.showErrorBox('Не удалось открыть файл', `${full}\n\n${err.message}`);
-    return;
-  }
-
   const doc = {
     id: `d${nextDocId++}`,
     path: full,
+    key,
     name: path.basename(full),
     pageCount: 0,
     page: 1,
@@ -387,30 +399,24 @@ async function openDialog() {
 function closeDoc(id) {
   const i = state.docs.findIndex((d) => d.id === id);
   if (i === -1) return;
+  const nextActive = tabAfterClose(state.docs, id, state.activeId);
   state.docs.splice(i, 1);
-  if (state.activeId === id) {
-    const next = state.docs[i] || state.docs[i - 1] || null;
-    state.activeId = next ? next.id : null;
+  if (nextActive !== state.activeId) {
+    state.activeId = nextActive;
     state.blank = 'none';
   }
 }
 
 function stepTab(delta) {
-  if (state.docs.length < 2) return;
-  const i = state.docs.findIndex((d) => d.id === state.activeId);
-  const n = state.docs.length;
-  state.activeId = state.docs[(((i + delta) % n) + n) % n].id;
+  const id = nextTabId(state.docs, state.activeId, delta);
+  if (!id) return;
+  state.activeId = id;
   state.blank = 'none';
 }
 
 // ---------------------------------------------------------------------------
 // Команды из renderer
 // ---------------------------------------------------------------------------
-function clampPage(doc, n) {
-  if (!doc || !doc.pageCount) return 1;
-  return Math.min(doc.pageCount, Math.max(1, n));
-}
-
 const commands = {
   open: () => openDialog(),
   openPath: ({ path: p }) => openPath(p),
@@ -418,28 +424,32 @@ const commands = {
   next: () => {
     const doc = activeDoc();
     if (!doc) return;
-    doc.page = clampPage(doc, doc.page + 1);
+    doc.page = clampPage(doc.pageCount, doc.page + 1);
     state.blank = 'none';
   },
   prev: () => {
     const doc = activeDoc();
     if (!doc) return;
-    doc.page = clampPage(doc, doc.page - 1);
+    doc.page = clampPage(doc.pageCount, doc.page - 1);
     state.blank = 'none';
   },
   goto: ({ page }) => {
     const doc = activeDoc();
     if (!doc) return;
-    doc.page = clampPage(doc, Number(page) || 1);
+    doc.page = clampPage(doc.pageCount, page);
     state.blank = 'none';
   },
   first: () => {
     const doc = activeDoc();
-    if (doc) doc.page = 1;
+    if (!doc) return;
+    doc.page = 1;
+    state.blank = 'none';
   },
   last: () => {
     const doc = activeDoc();
-    if (doc) doc.page = clampPage(doc, doc.pageCount);
+    if (!doc) return;
+    doc.page = clampPage(doc.pageCount, doc.pageCount);
+    state.blank = 'none';
   },
 
   blank: ({ mode }) => {
@@ -450,7 +460,18 @@ const commands = {
     const doc = docById(id);
     if (!doc) return;
     doc.pageCount = Number(pageCount) || 0;
-    doc.page = clampPage(doc, doc.page);
+    doc.page = clampPage(doc.pageCount, doc.page);
+  },
+
+  /** Renderer не смог разобрать файл: закрываем вкладку и говорим об этом вслух. */
+  'doc:failed': ({ id, message }) => {
+    const doc = docById(id);
+    if (!doc) return;
+    closeDoc(id);
+    dialog.showErrorBox(
+      'Не удалось открыть файл',
+      `${doc.path}\n\n${message || 'файл повреждён или защищён паролем'}`,
+    );
   },
 
   'tab:activate': ({ id }) => {
@@ -521,7 +542,13 @@ const commands = {
 ipcMain.on('cmd', async (_e, msg) => {
   const fn = commands[msg?.type];
   if (!fn) return;
-  await fn(msg.payload || {});
+  try {
+    await fn(msg.payload || {});
+  } catch (err) {
+    // Без этого упавшая команда пропускала бы broadcast и оба окна замирали
+    // на устаревшем состоянии, а reject оседал необработанным.
+    console.error(`команда ${msg.type} завершилась ошибкой:`, err);
+  }
   broadcast();
 });
 

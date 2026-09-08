@@ -265,12 +265,34 @@ async function ensureActive(s) {
     if (state?.activeId !== id) return; // вкладку успели переключить
     useDoc(id, pdf);
     renderSlides(state);
-  } catch {
+  } catch (err) {
+    // Файл не разобрался. Молча оставлять на экране прошлую презентацию нельзя:
+    // main закроет вкладку и покажет ошибку.
     cache.delete(id);
+    window.deck.cmd('doc:failed', { id, message: err?.message });
   } finally {
     if (loadingId === id) loadingId = null;
   }
 }
+
+/**
+ * Освобождает документы закрытых вкладок. Без этого каждая открытая за доклад
+ * презентация оставалась бы разобранной в памяти до выхода из программы —
+ * и здесь, и в worker-е pdf.js.
+ */
+function pruneCache(st) {
+  const alive = new Set(st.docs.map((d) => d.id));
+  for (const [id, promise] of cache) {
+    if (alive.has(id)) continue;
+    cache.delete(id);
+    promise.then((pdf) => pdf.destroy?.()).catch(() => {});
+    if (loadedId === id) {
+      activePdf = null;
+      loadedId = null;
+    }
+  }
+}
+
 
 let notesSeq = 0;
 async function showNotes(pdf, n) {
@@ -332,6 +354,7 @@ function renderSlides(s) {
 
 function applyState(s) {
   state = s;
+  pruneCache(s);
   renderChrome(s);
   ensureActive(s);
   renderSlides(s);

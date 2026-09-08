@@ -45,12 +45,37 @@ async function ensureActive(s) {
     const pdf = await getPdf(id);
     if (state?.activeId !== id) return; // вкладку успели переключить
     use(id, pdf);
-  } catch {
+  } catch (err) {
+    // Об ошибке сообщает окно лектора; здесь просто не держим битый документ.
     cache.delete(id);
+    if (loadedId === id) {
+      activePdf = null;
+      loadedId = null;
+    }
   } finally {
     if (loadingId === id) loadingId = null;
   }
 }
+
+/**
+ * Освобождает документы закрытых вкладок. Без этого каждая открытая за доклад
+ * презентация оставалась бы разобранной в памяти до выхода из программы —
+ * и здесь, и в worker-е pdf.js.
+ */
+function pruneCache(st) {
+  const alive = new Set(st.docs.map((d) => d.id));
+  for (const [id, promise] of cache) {
+    if (alive.has(id)) continue;
+    cache.delete(id);
+    promise.then((pdf) => pdf.destroy?.()).catch(() => {});
+    if (loadedId === id) {
+      activePdf = null;
+      loadedId = null;
+      lastKey = '';
+    }
+  }
+}
+
 
 function use(id, pdf) {
   activePdf = pdf;
@@ -76,6 +101,7 @@ let wasShowing = false;
 
 function applyState(s) {
   state = s;
+  pruneCache(s);
   const showing = !!s.audienceFullscreen;
   document.body.classList.toggle('showing', showing);
   // На старте показа курсор прячем сразу: смена размера окна сама шлёт mousemove,
