@@ -1,9 +1,9 @@
-# PodiumPDF
+# SlidePDF
 
 **English** · [Русский](README.ru.md)
 
-[![Latest release](https://img.shields.io/github/v/release/djdrise/PodiumPDF?label=release)](https://github.com/djdrise/PodiumPDF/releases/latest)
-[![Check](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml/badge.svg)](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml)
+[![Latest release](https://img.shields.io/github/v/release/djdrise/SlidePDF?label=release)](https://github.com/djdrise/SlidePDF/releases/latest)
+[![Check](https://github.com/djdrise/SlidePDF/actions/workflows/check.yml/badge.svg)](https://github.com/djdrise/SlidePDF/actions/workflows/check.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 A cross-platform PDF viewer for conference talks: the slide goes to the
@@ -18,7 +18,7 @@ macOS · Windows · Linux (Electron + pdf.js).
 ## Install
 
 Prebuilt installers are on the
-[Releases](https://github.com/djdrise/PodiumPDF/releases) page: `.dmg` for macOS
+[Releases](https://github.com/djdrise/SlidePDF/releases) page: `.dmg` for macOS
 (Apple Silicon and Intel separately), `.exe` for Windows (installer and
 portable), `.AppImage` and `.deb` for Linux.
 
@@ -27,7 +27,7 @@ The builds are not code-signed, so the first launch needs a nudge:
 * **macOS** — right-click the app → “Open”, then confirm. A plain double-click
   is blocked by Gatekeeper.
 * **Windows** — SmartScreen warns: “More info” → “Run anyway”.
-* **Linux** — make the AppImage executable: `chmod +x PodiumPDF-*.AppImage`.
+* **Linux** — make the AppImage executable: `chmod +x SlidePDF-*.AppImage`.
 
 ## Running from source
 
@@ -147,8 +147,9 @@ recognises the Cyrillic letters on the same physical keys.
 
 ## Logo
 
-The mark is a lectern: a slanted top on a pedestal. The blue board repeats the
-accent colour of the interface.
+The mark is a deck of slides: three same-sized cards fanned diagonally. The tile
+is coral — in a taskbar where almost everything is blue and grey, a warm colour
+stands out.
 
 ```
 assets/logo.svg        the mark for the interface (two-tone, on a light background)
@@ -166,9 +167,9 @@ in Electron.
 The Windows `.ico` is built here rather than left to electron-builder: that one
 squeezes a single 1024×1024 image down to every size at once, and a 64× downscale
 smears the detail away. Here each size is rasterised from the vector separately,
-at its natural size, and 16, 24 and 32 pixels come from `icon-small.svg` — an
-untilted board with thicker parts, because at 16 pixels the tilt turns into
-stair-steps and the thin base disappears altogether.
+at its natural size, and 16, 24 and 32 pixels come from `icon-small.svg`: two
+cards instead of three and a larger offset, because at 16 pixels the third card
+shifts by less than a pixel and merges with its neighbour.
 
 ## Layout
 
@@ -197,7 +198,7 @@ nothing.
 
 GNU General Public License v3.0 or later — full text in [LICENSE](LICENSE).
 
-> PodiumPDF is free software: you can redistribute it and/or modify it under
+> SlidePDF is free software: you can redistribute it and/or modify it under
 > the terms of the GNU General Public License as published by the Free Software
 > Foundation, either version 3 of the License, or (at your option) any later
 > version. It is distributed in the hope that it will be useful, but WITHOUT ANY

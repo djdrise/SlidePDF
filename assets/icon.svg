@@ -1,15 +1,13 @@
-<!-- Иконка приложения: белая трибуна на синей плитке. Исходник для assets/icon.png. -->
+<!-- Иконка приложения: колода слайдов на коралловой плитке. Исходник для assets/icon.png. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3b82f6" />
-      <stop offset="1" stop-color="#1d4ed8" />
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff9a3c" />
+      <stop offset="1" stop-color="#e0402f" />
     </linearGradient>
   </defs>
   <rect width="1024" height="1024" rx="230" fill="url(#tile)" />
-  <g transform="translate(512 512) scale(20) translate(-24 -24.4)" fill="#ffffff">
-  <path d="M18.6 17h10.8l3 17.4H15.6z" />
-  <rect x="12" y="34.4" width="24" height="5.2" rx="2.6" />
-  <rect x="9" y="11.5" width="30" height="6.6" rx="2.4" transform="rotate(-9 24 14.8)" />
-  </g>
+  <rect x="317" y="297" width="500" height="300" rx="38" fill="#ffffff" opacity=".40" />
+  <rect x="262" y="362" width="500" height="300" rx="38" fill="#ffffff" opacity=".65" />
+  <rect x="207" y="427" width="500" height="300" rx="38" fill="#ffffff" />
 </svg>

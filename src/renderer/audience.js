@@ -112,7 +112,7 @@ document.getElementById('bar-close').addEventListener('click', () => window.clos
  * @param {number} w ожидаемая ширина окна в CSS-пикселях
  * @param {number} h ожидаемая высота окна
  */
-window.__podiumPrepare = (w, h) =>
+window.__slidePrepare = (w, h) =>
   new Promise((resolve) => {
     const deadline = performance.now() + 400;
     const waitLayout = () => {

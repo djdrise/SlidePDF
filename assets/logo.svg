@@ -1,7 +1,7 @@
-<!-- Знак PodiumPDF: трибуна докладчика — наклонная столешница на тумбе.
-     Наклонная доска синяя (акцент интерфейса), тумба и основание — чернила. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="PodiumPDF">
-  <path d="M18.6 17h10.8l3 17.4H15.6z" fill="#1b1e23" />
-  <rect x="12" y="34.4" width="24" height="5.2" rx="2.6" fill="#1b1e23" />
-  <rect x="9" y="11.5" width="30" height="6.6" rx="2.4" fill="#2563eb" transform="rotate(-9 24 14.8)" />
+<!-- Знак SlidePDF для интерфейса: колода слайдов. Тот же силуэт, что на иконке,
+     но в цвете под светлый фон. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="SlidePDF">
+  <rect x="14.86" y="13.92" width="23.44" height="14.06" rx="1.8" fill="#f8ccc0" />
+  <rect x="12.28" y="16.97" width="23.44" height="14.06" rx="1.8" fill="#f09a84" />
+  <rect x="9.7" y="20.02" width="23.44" height="14.06" rx="1.8" fill="#e0402f" />
 </svg>

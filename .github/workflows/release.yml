@@ -76,13 +76,13 @@ jobs:
           Сборки не подписаны цифровым сертификатом. На macOS первый запуск — через
           правый клик по программе и «Открыть»; Windows SmartScreen может попросить
           «Подробнее» → «Выполнить в любом случае»; `.AppImage` нужно сделать
-          исполняемым: `chmod +x PodiumPDF-*.AppImage`.
+          исполняемым: `chmod +x SlidePDF-*.AppImage`.
           MD
           # Список файлов только массивом: неэкранированный $(find) разбивает
           # имена с пробелами на отдельные аргументы.
           mapfile -t files < <(find dist -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \) | sort)
           printf 'к релизу: %s\n' "${files[@]}"
           gh release create "${{ github.ref_name }}" \
-            --title "PodiumPDF ${{ github.ref_name }}" \
+            --title "SlidePDF ${{ github.ref_name }}" \
             --notes-file notes.md \
             "${files[@]}"

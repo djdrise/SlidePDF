@@ -1,9 +1,9 @@
-# PodiumPDF
+# SlidePDF
 
 [English](README.md) · **Русский**
 
-[![Последний релиз](https://img.shields.io/github/v/release/djdrise/PodiumPDF?label=релиз)](https://github.com/djdrise/PodiumPDF/releases/latest)
-[![Проверка](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml/badge.svg)](https://github.com/djdrise/PodiumPDF/actions/workflows/check.yml)
+[![Последний релиз](https://img.shields.io/github/v/release/djdrise/SlidePDF?label=релиз)](https://github.com/djdrise/SlidePDF/releases/latest)
+[![Проверка](https://github.com/djdrise/SlidePDF/actions/workflows/check.yml/badge.svg)](https://github.com/djdrise/SlidePDF/actions/workflows/check.yml)
 [![Лицензия: GPL-3.0](https://img.shields.io/badge/лицензия-GPL--3.0-blue)](LICENSE)
 
 Мультиплатформенный просмотрщик PDF для докладов на конференциях: слайд уходит
@@ -18,7 +18,7 @@ macOS · Windows · Linux (Electron + pdf.js).
 ## Установка
 
 Готовые сборки — на странице
-[Releases](https://github.com/djdrise/PodiumPDF/releases): `.dmg` для macOS
+[Releases](https://github.com/djdrise/SlidePDF/releases): `.dmg` для macOS
 (отдельно Apple Silicon и Intel), `.exe` для Windows (установщик и портативный)
 и `.AppImage` / `.deb` для Linux.
 
@@ -28,7 +28,7 @@ macOS · Windows · Linux (Electron + pdf.js).
   двойной клик Gatekeeper заблокирует.
 * **Windows** — SmartScreen покажет предупреждение: «Подробнее» → «Выполнить
   в любом случае».
-* **Linux** — `.AppImage` нужно сделать исполняемым: `chmod +x PodiumPDF-*.AppImage`.
+* **Linux** — `.AppImage` нужно сделать исполняемым: `chmod +x SlidePDF-*.AppImage`.
 
 ## Запуск из исходников
 
@@ -148,8 +148,9 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ## Логотип
 
-Знак — трибуна докладчика: наклонная столешница на тумбе. Синяя доска повторяет
-акцентный цвет интерфейса.
+Знак — колода слайдов: три карточки одного размера, сдвинутые по диагонали.
+Плитка коралловая: в панели задач, где почти всё синее и серое, тёплый цвет
+заметно выделяется.
 
 ```
 assets/logo.svg        знак для интерфейса (двухцветный, на светлом фоне)
@@ -166,9 +167,9 @@ assets/icon.ico        16…256 для Windows, собирается здесь 
 `.ico` для Windows собираем сами, а не отдаём electron-builder: тот ужимает одну
 картинку 1024×1024 сразу до всех размеров, и уменьшение в 64 раза размывает
 детали. Здесь каждый размер растрируется из вектора отдельно, в натуральную
-величину, а 16, 24 и 32 пикселя берутся из `icon-small.svg` — там доска без
-наклона и элементы толще, потому что на 16 пикселях наклон даёт «лесенку», а
-тонкая подставка пропадает совсем.
+величину, а 16, 24 и 32 пикселя берутся из `icon-small.svg`: там две карточки
+вместо трёх и смещение крупнее, потому что на 16 пикселях сдвиг третьей
+карточки меньше пикселя и она сливается с соседней.
 
 ## Структура
 
@@ -194,7 +195,7 @@ docs/                   скриншот для README
 
 GNU General Public License v3.0 или новее — полный текст в [LICENSE](LICENSE).
 
-> PodiumPDF is free software: you can redistribute it and/or modify it under
+> SlidePDF is free software: you can redistribute it and/or modify it under
 > the terms of the GNU General Public License as published by the Free Software
 > Foundation, either version 3 of the License, or (at your option) any later
 > version. It is distributed in the hope that it will be useful, but WITHOUT ANY

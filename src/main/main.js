@@ -95,7 +95,7 @@ async function revealAudience(win) {
   try {
     await Promise.race([
       win.webContents.executeJavaScript(
-        `window.__podiumPrepare ? window.__podiumPrepare(${width}, ${height}) : null`,
+        `window.__slidePrepare ? window.__slidePrepare(${width}, ${height}) : null`,
         true,
       ),
       // Страховка: renderer мог ещё не загрузиться или зависнуть на рендере.
@@ -238,7 +238,7 @@ function createWindows() {
   const audienceDisplay = displayById(state.audienceDisplayId);
 
   presenterWin = new BrowserWindow({
-    title: 'PodiumPDF',
+    title: 'SlidePDF',
     icon: ICON,
     backgroundColor: '#ffffff',
     show: false,
@@ -255,7 +255,7 @@ function createWindows() {
   });
 
   audienceWin = new BrowserWindow({
-    title: 'PodiumPDF — экран зрителей',
+    title: 'SlidePDF — экран зрителей',
     icon: ICON,
     backgroundColor: '#000000',
     show: false,

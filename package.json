@@ -1,5 +1,5 @@
 {
-  "name": "podiumpdf",
+  "name": "slidepdf",
   "version": "0.1.0",
   "description": "Cross-platform PDF viewer for conference talks: projector output and a presenter view",
   "main": "src/main/main.js",
@@ -10,12 +10,12 @@
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/djdrise/PodiumPDF.git"
+    "url": "git+https://github.com/djdrise/SlidePDF.git"
   },
   "bugs": {
-    "url": "https://github.com/djdrise/PodiumPDF/issues"
+    "url": "https://github.com/djdrise/SlidePDF/issues"
   },
-  "homepage": "https://github.com/djdrise/PodiumPDF#readme",
+  "homepage": "https://github.com/djdrise/SlidePDF#readme",
   "scripts": {
     "start": "node scripts/start.js",
     "dev": "node scripts/start.js --dev",
@@ -34,8 +34,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "dev.pautov.podiumpdf",
-    "productName": "PodiumPDF",
+    "appId": "dev.pautov.slidepdf",
+    "productName": "SlidePDF",
     "files": [
       "assets/**/*",
       "src/**/*",
