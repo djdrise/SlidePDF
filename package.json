@@ -20,6 +20,7 @@
     "start": "node scripts/start.js",
     "dev": "node scripts/start.js --dev",
     "check": "node scripts/check.js",
+    "test": "node --test test/*.test.js",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
@@ -76,7 +77,7 @@
         "role": "Viewer"
       }
     ],
-    "asar": false,
+    "asar": true,
     "icon": "assets/icon.png",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "nsis": {
@@ -84,7 +85,10 @@
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
-    }
+    },
+    "asarUnpack": [
+      "assets/icon.png"
+    ]
   },
   "engines": {
     "node": ">=20"

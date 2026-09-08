@@ -47,11 +47,15 @@ npm run dev               # same, plus renderer logs in the terminal
 
 ```bash
 npm run check     # syntax check across all sources
+npm test          # tests for the pure show logic
 ```
 
-There are no tests: nearly all of the code is window, display and rendering
-work that only makes sense to verify by running it. `npm run check` catches
-typos before startup, and GitHub Actions runs the same command.
+Tests run on Node's built-in runner (`node --test`), with no dependencies. They
+cover the pure logic in [`src/main/lib/deck.js`](src/main/lib/deck.js): page
+bounds, tab order, screen selection. The rest of the main process is tied to
+Electron windows and displays and only makes sense to verify by running it —
+that is what `npm run check` guards against typos before startup. GitHub Actions
+runs both.
 
 ## Building installers
 
@@ -177,6 +181,7 @@ shifts by less than a pixel and merges with its neighbour.
 
 ```
 src/main/main.js        displays, windows, show state, menu
+src/main/lib/deck.js    pure logic: pages, tabs, screen choice
 src/preload/preload.js  contextBridge: commands, subscriptions, drag-and-drop paths
 src/renderer/
   presenter.*           presenter view
@@ -186,6 +191,7 @@ src/renderer/
 scripts/start.js        launcher that clears ELECTRON_RUN_AS_NODE
 scripts/make-icon.js    builds assets/icon.png from assets/icon.svg
 scripts/check.js        syntax check across the sources
+test/                   tests for the pure logic
 assets/                 logo and application icon
 docs/                   screenshot for the README
 ```
