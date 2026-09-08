@@ -151,14 +151,24 @@ The mark is a lectern: a slanted top on a pedestal. The blue board repeats the
 accent colour of the interface.
 
 ```
-assets/logo.svg   the mark for the interface (two-tone, on a light background)
-assets/icon.svg   the app icon — a white mark on a blue tile
-assets/icon.png   1024×1024, electron-builder turns it into .icns and .ico
+assets/logo.svg        the mark for the interface (two-tone, on a light background)
+assets/icon.svg        the app icon — a white mark on a blue tile
+assets/icon-small.svg  a simplified mark for the small icon sizes
+assets/icon.png        1024×1024, electron-builder turns it into .icns for macOS
+assets/icon.ico        16…256 for Windows, built here
 ```
 
-`npm run icon` rebuilds the PNG from the SVG using Chromium: a standalone SVG
-converter may be missing from the system, while Electron is already installed.
-The script bootstraps itself — under plain Node it re-spawns itself in Electron.
+`npm run icon` rebuilds both images from the SVGs using Chromium: a standalone
+SVG converter may be missing from the system, while Electron is already
+installed. The script bootstraps itself — under plain Node it re-spawns itself
+in Electron.
+
+The Windows `.ico` is built here rather than left to electron-builder: that one
+squeezes a single 1024×1024 image down to every size at once, and a 64× downscale
+smears the detail away. Here each size is rasterised from the vector separately,
+at its natural size, and 16, 24 and 32 pixels come from `icon-small.svg` — an
+untilted board with thicker parts, because at 16 pixels the tilt turns into
+stair-steps and the thin base disappears altogether.
 
 ## Layout
 

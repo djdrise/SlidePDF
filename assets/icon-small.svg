@@ -1,0 +1,18 @@
+<!-- Знак для мелких размеров иконки (16–32 px). Тот же силуэт трибуны, но
+     без наклона доски и с более толстыми элементами: на 16 пикселях наклон
+     даёт «лесенку», а тонкая подставка исчезает вовсе. Плитка скруглена
+     слабее — сильное скругление на мелком размере съедает углы. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b82f6" />
+      <stop offset="1" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="170" fill="url(#tile)" />
+  <g transform="translate(512 512) scale(19) translate(-24 -26)" fill="#ffffff">
+    <rect x="5" y="12" width="38" height="8.4" rx="1.6" />
+    <path d="M16.6 20h14.8l3.2 13.6H13.4z" />
+    <rect x="8.5" y="33" width="31" height="7" rx="2" />
+  </g>
+</svg>
