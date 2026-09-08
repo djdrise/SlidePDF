@@ -8,6 +8,7 @@ const els = {
   pages: $('pages'),
   badge: $('display-badge'),
   blankFlag: $('blank-flag'),
+  freezeFlag: $('freeze-flag'),
   nextNum: $('next-num'),
   notes: $('notes'),
   filmstrip: $('filmstrip'),
@@ -109,6 +110,11 @@ class ThumbGrid {
     for (const el of this.items) el.classList.toggle(cls, Number(el.dataset.page) === n);
     if (!scroll) return;
     this.items[n - 1]?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }
+
+  /** Слайд, на котором держится зал. null — стоп-кадра нет. */
+  setFrozen(n) {
+    for (const el of this.items) el.classList.toggle('frozen', Number(el.dataset.page) === n);
   }
 }
 
@@ -319,6 +325,18 @@ function renderChrome(s) {
   if (!els.pages.hidden) els.pages.textContent = `${doc.page} / ${doc.pageCount}`;
 
   els.blankFlag.hidden = s.blank === 'none';
+
+  // Стоп-кадр: показываем, на чём остался зал. Если он застыл на другой
+  // вкладке, без имени файла было бы непонятно, о каком слайде речь.
+  const frozenDoc = s.freeze ? s.docs.find((d) => d.id === s.freeze.docId) : null;
+  els.freezeFlag.hidden = !frozenDoc;
+  if (frozenDoc) {
+    els.freezeFlag.textContent =
+      frozenDoc.id === s.activeId
+        ? `Зал видит слайд ${s.freeze.page}`
+        : `Зал видит ${frozenDoc.name}, слайд ${s.freeze.page}`;
+  }
+  strip.setFrozen(frozenDoc && frozenDoc.id === s.activeId ? s.freeze.page : null);
 
   // На одном экране сообщать нечего — значок показываем только когда есть внешний.
   els.badge.hidden = s.displayCount < 2;

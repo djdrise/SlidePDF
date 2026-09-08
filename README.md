@@ -114,6 +114,13 @@ out of its preview size while the slide caught up. On macOS the show uses
 `simpleFullScreen` so that no separate Space is created with its transition
 animation.
 
+**Freeze** (<kbd>F</kbd>) detaches the room from your navigation: the audience
+screen stays on the current slide while you browse the deck on your own — find
+the slide behind a question, check a number, come back. The room sees none of it.
+Neither navigation nor switching tabs lifts the freeze; only pressing it again or
+ending the show does. A reminder of what the room is looking at stays in the
+header, and the slide is marked in the thumbnail strip.
+
 Focus moves to the full-screen window immediately, so a presenter remote and the
 keyboard act on the show. The mouse cursor hides there — instantly on start, and
 again two seconds after the mouse stops moving.
@@ -143,6 +150,7 @@ again two seconds after the mouse stops moving.
 | <kbd>G</kbd> | grid of all slides |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | next / previous tab |
 | <kbd>B</kbd> | black out the audience screen |
+| <kbd>F</kbd> | freeze: the room stays on the slide while you browse |
 | <kbd>F5</kbd> | start / end the show |
 | <kbd>O</kbd> | open a PDF |
 | <kbd>Esc</kbd> | close the grid, clear the black screen, end the show |

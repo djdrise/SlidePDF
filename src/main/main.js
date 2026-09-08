@@ -25,6 +25,13 @@ const state = {
   docs: [],
   activeId: null,
   blank: 'none', // none | black
+  /**
+   * Стоп-кадр: зал остаётся на этом слайде, пока лектор листает у себя.
+   * Держим и вкладку, и страницу — иначе переключение вкладок утащило бы
+   * зал за собой, а весь смысл в обратном.
+   * @type {{docId: string, page: number}|null}
+   */
+  freeze: null,
   /** Список экранов для окна настроек. */
   displays: [],
   /** Экран показа выбран вручную — автоматика его больше не переназначает. */
@@ -155,6 +162,7 @@ function exitPresentationFullscreen(win, display) {
   if (!win || win.isDestroyed()) return;
   showEpoch += 1;
   state.audienceFullscreen = false;
+  state.freeze = null;
   broadcast();
 
   win.setOpacity(0);
@@ -387,6 +395,8 @@ async function openDialog() {
 function closeDoc(id) {
   const i = state.docs.findIndex((d) => d.id === id);
   if (i === -1) return;
+  // Замороженной вкладки больше нет — держать зал не на чем.
+  if (state.freeze && state.freeze.docId === id) state.freeze = null;
   const nextActive = tabAfterClose(state.docs, id, state.activeId);
   state.docs.splice(i, 1);
   if (nextActive !== state.activeId) {
@@ -442,6 +452,21 @@ const commands = {
 
   blank: ({ mode }) => {
     state.blank = state.blank === mode ? 'none' : mode;
+  },
+
+  /**
+   * Приватная навигация: зал замирает на текущем слайде, лектор листает
+   * свободно. Ни переходы, ни смена вкладки стоп-кадр не снимают — только
+   * повторное нажатие, закрытие этой вкладки или конец показа.
+   */
+  'freeze:toggle': () => {
+    if (state.freeze) {
+      state.freeze = null;
+      return;
+    }
+    const doc = activeDoc();
+    if (!doc) return;
+    state.freeze = { docId: doc.id, page: doc.page };
   },
 
   'doc:meta': ({ id, pageCount }) => {
@@ -598,6 +623,12 @@ function buildMenu() {
         { label: 'Предыдущий слайд', ...hint('Left'), click: send('prev') },
         { type: 'separator' },
         { label: 'Чёрный экран', ...hint('B'), click: send('blank', { mode: 'black' }) },
+        {
+          label: 'Стоп-кадр для зала',
+          ...hint('F'),
+          enabled: Boolean(activeDoc()),
+          click: send('freeze:toggle'),
+        },
       ],
     },
     {

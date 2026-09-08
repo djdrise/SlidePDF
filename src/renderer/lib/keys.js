@@ -75,6 +75,7 @@ export function bindKeys(onLocal) {
     else if (k === 'Home') window.deck.cmd('first');
     else if (k === 'End') window.deck.cmd('last');
     else if (isKey(e, 'b', 'KeyB')) window.deck.cmd('blank', { mode: 'black' });
+    else if (isKey(e, 'f', 'KeyF')) window.deck.cmd('freeze:toggle');
     else if (isKey(e, 'o', 'KeyO')) window.deck.cmd('open');
     else if (k === 'F5') window.deck.cmd('audience:toggleFullscreen');
     else if (k === 'Escape') window.deck.cmd('audience:exitFullscreen');

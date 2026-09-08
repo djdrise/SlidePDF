@@ -28,8 +28,22 @@ function getPdf(id) {
   return promise;
 }
 
+/**
+ * Что должен показывать зал: замороженный слайд, если стоп-кадр включён,
+ * иначе текущий. Стоп-кадр держит и вкладку, поэтому лектор может уйти
+ * в другую презентацию, а зал этого не заметит.
+ */
+function shown(s) {
+  if (s.freeze) {
+    const frozen = s.docs.find((d) => d.id === s.freeze.docId);
+    if (frozen) return { id: frozen.id, page: s.freeze.page };
+  }
+  const doc = s.docs.find((d) => d.id === s.activeId);
+  return doc ? { id: doc.id, page: doc.page } : null;
+}
+
 async function ensureActive(s) {
-  const id = s.activeId;
+  const id = shown(s)?.id ?? null;
   if (!id) {
     activePdf = null;
     loadedId = null;
@@ -43,7 +57,7 @@ async function ensureActive(s) {
   loadingId = id;
   try {
     const pdf = await getPdf(id);
-    if (state?.activeId !== id) return; // вкладку успели переключить
+    if (shown(state)?.id !== id) return; // показываемый документ успели сменить
     use(id, pdf);
   } catch (err) {
     // Об ошибке сообщает окно лектора; здесь просто не держим битый документ.
@@ -87,11 +101,10 @@ function use(id, pdf) {
 }
 
 function renderSlide(s) {
-  if (!s || !activePdf || loadedId !== s.activeId) return;
-  const doc = s.docs.find((d) => d.id === s.activeId);
-  if (!doc) return;
-  const page = Math.min(Math.max(1, doc.page), activePdf.numPages);
-  const key = `${s.activeId}:${page}`;
+  const target = shown(s);
+  if (!s || !activePdf || !target || loadedId !== target.id) return;
+  const page = Math.min(Math.max(1, target.page), activePdf.numPages);
+  const key = `${target.id}:${page}`;
   if (key === lastKey) return;
   lastKey = key;
   view.show(page);

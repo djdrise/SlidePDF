@@ -243,6 +243,9 @@ button.ghost:hover { color: var(--accent); border-color: var(--accent); }
 }
 .thumb:hover { border-color: var(--dim-soft); }
 .thumb.current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+/* Слайд, на котором держится зал во время стоп-кадра. */
+.thumb.frozen { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn-bg); }
+.thumb.frozen .num { background: var(--warn); border-color: var(--warn); color: #fff; font-weight: 600; }
 .thumb.current .num { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 
 /* ---------- Сетка всех слайдов ---------- */
