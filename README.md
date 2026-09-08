@@ -182,6 +182,7 @@ shifts by less than a pixel and merges with its neighbour.
 ```
 src/main/main.js        displays, windows, show state, menu
 src/main/lib/deck.js    pure logic: pages, tabs, screen choice
+src/main/lib/layout.js  the window-to-display layout decision
 src/preload/preload.js  contextBridge: commands, subscriptions, drag-and-drop paths
 src/renderer/
   presenter.*           presenter view

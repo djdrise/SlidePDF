@@ -182,6 +182,7 @@ assets/icon.ico        16…256 для Windows, собирается здесь 
 ```
 src/main/main.js        дисплеи, окна, состояние показа, меню
 src/main/lib/deck.js    чистая логика: страницы, вкладки, выбор экрана
+src/main/lib/layout.js  решение о раскладке окон по дисплеям
 src/preload/preload.js  contextBridge: команды, подписки, путь файла из drag&drop
 src/renderer/
   presenter.*           режим лектора

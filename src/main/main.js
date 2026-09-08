@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, dialog, screen, Menu, shell } = require('el
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { clampPage, nextTabId, tabAfterClose, chooseLayout } = require('./lib/deck');
+const { planLayout, centeredBounds } = require('./lib/layout');
 
 const IS_MAC = process.platform === 'darwin';
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
@@ -178,69 +179,56 @@ function isFullscreenNow(win) {
  * не запускается: окно зрителей появляется только по команде «Показ».
  */
 function applyDisplayLayout() {
-  const all = screen.getAllDisplays();
-  state.displayCount = all.length;
+  const displays = screen.getAllDisplays();
+  state.displayCount = displays.length;
   refreshDisplays();
 
-  // Дисплей мог исчезнуть — откатываемся на раскладку по умолчанию, а ручной
-  // выбор экрана сбрасываем: выбранного экрана больше нет.
-  const audienceDisplayLost = !displayById(state.audienceDisplayId);
-  if (audienceDisplayLost) state.audiencePinned = false;
-  if (audienceDisplayLost || !displayById(state.presenterDisplayId)) {
-    Object.assign(state, defaultDisplayLayout());
-  }
-  // Проектор подключили, когда оба окна сидели на одном экране — уводим зрителей.
-  // Ручной выбор в настройках это не трогает.
-  if (!state.audiencePinned && state.presenterDisplayId === state.audienceDisplayId && all.length > 1) {
-    Object.assign(state, defaultDisplayLayout());
-  }
+  const plan = planLayout({
+    displayIds: displays.map((d) => d.id),
+    primaryId: screen.getPrimaryDisplay().id,
+    presenterDisplayId: state.presenterDisplayId,
+    audienceDisplayId: state.audienceDisplayId,
+    audiencePinned: state.audiencePinned,
+    showing: state.audienceFullscreen,
+    presenterFullscreen: Boolean(
+      presenterWin && !presenterWin.isDestroyed() && presenterWin.isFullScreen(),
+    ),
+    presenterOn: displayIdOf(presenterWin),
+    audienceOn: displayIdOf(audienceWin),
+  });
+
+  state.presenterDisplayId = plan.presenterDisplayId;
+  state.audienceDisplayId = plan.audienceDisplayId;
+  state.audiencePinned = plan.audiencePinned;
 
   const presenterDisplay = displayById(state.presenterDisplayId);
   const audienceDisplay = displayById(state.audienceDisplayId);
 
-  // Двигаем окно, только если оно оказалось не на своём дисплее: иначе каждое
-  // display-metrics-changed (смена разрешения, масштаба) сбрасывало бы размер
-  // и положение окна, которые лектор выставил руками.
-  if (isMisplaced(presenterWin, presenterDisplay) && !presenterWin.isFullScreen()) {
-    centerOn(presenterWin, presenterDisplay, 0.85);
-  }
+  if (plan.presenter === 'center') centerOn(presenterWin, presenterDisplay, 0.85);
 
   if (audienceWin && !audienceWin.isDestroyed()) {
-    if (state.audienceFullscreen && audienceDisplayLost) {
+    if (plan.audience === 'exit') {
       // Проектор отключили прямо в показе — возвращаем лектора к его интерфейсу.
       exitPresentationFullscreen(audienceWin, audienceDisplay);
       presenterWin?.focus();
-    } else if (state.audienceFullscreen) {
-      // Показ идёт: его нельзя прерывать. Скрытие строки меню и Dock меняет
-      // workArea и присылает display-metrics-changed — если реагировать на это
-      // перестроением, показ схлопнется через доли секунды после запуска.
-      if (isMisplaced(audienceWin, audienceDisplay)) {
-        enterPresentationFullscreen(audienceWin, audienceDisplay);
-      }
-    } else if (isMisplaced(audienceWin, audienceDisplay)) {
+    } else if (plan.audience === 'enter') {
+      enterPresentationFullscreen(audienceWin, audienceDisplay);
+    } else if (plan.audience === 'center') {
       centerOn(audienceWin, audienceDisplay, 0.5);
     }
   }
   broadcast();
 }
 
-/** Окно находится не на том дисплее, который ему назначен. */
-function isMisplaced(win, display) {
-  if (!win || win.isDestroyed() || !display) return false;
-  return screen.getDisplayMatching(win.getBounds()).id !== display.id;
+/** На каком дисплее окно находится сейчас. null — окна нет. */
+function displayIdOf(win) {
+  if (!win || win.isDestroyed()) return null;
+  return screen.getDisplayMatching(win.getBounds()).id;
 }
 
 function centerOn(win, display, scale = 0.8) {
   if (!win || win.isDestroyed() || !display) return;
-  const wa = display.workArea;
-  const w = Math.round(wa.width * scale);
-  const h = Math.round(wa.height * scale);
-  win.setBounds({
-    x: Math.round(wa.x + (wa.width - w) / 2),
-    y: Math.round(wa.y + (wa.height - h) / 2),
-    width: w,
-    height: h,
-  });
+  win.setBounds(centeredBounds(display.workArea, scale));
 }
 
 // ---------------------------------------------------------------------------
