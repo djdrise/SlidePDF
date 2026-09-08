@@ -72,14 +72,19 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ## How the screens work
 
-On startup the app looks at the list of displays:
+The audience window does not appear on startup at all — only on “Present”
+(<kbd>F5</kbd>), and it leaves the screen once the show ends. To see beforehand
+what the room will see, open it by hand: “Show / hide audience window” in the
+menu.
 
-* **An external screen is present** — the audience window goes full screen on
-  it by itself, the presenter view stays on the built-in display.
-* **A single screen** — the audience window opens as an ordinary preview
-  window, so you can prepare before the talk.
+The app picks the screen for the show on its own:
+
+* **An external screen is present** — the slide goes there, the presenter view
+  stays on the built-in display.
+* **A single screen** — the show covers the presenter window.
 * A projector plugged in or unplugged mid-talk — `display-added` /
-  `display-removed` rebuild the layout on the fly.
+  `display-removed` rebuild the layout on the fly, and a running show moves to
+  the right screen without a break. Plugging one in does not start a show.
 * The automation can be overridden: the gear in the header opens settings with
   a list of screens, where you pick the one the slide goes to. After a manual
   choice the automation stops reassigning the show screen — until that monitor

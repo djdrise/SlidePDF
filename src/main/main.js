@@ -90,32 +90,24 @@ function defaultDisplayLayout() {
  * Всё время смены геометрии окно держится прозрачным, поэтому ни растягивание
  * рамки, ни «догоняющий» размер слайда наружу не видны.
  */
-async function revealAudience(win, { focus, awaitPaint }) {
-  if (awaitPaint) {
-    const { width, height } = win.getBounds();
-    try {
-      await Promise.race([
-        win.webContents.executeJavaScript(
-          `window.__podiumPrepare ? window.__podiumPrepare(${width}, ${height}) : null`,
-          true,
-        ),
-        // Страховка: renderer мог ещё не загрузиться или зависнуть на рендере.
-        new Promise((r) => setTimeout(r, 600)),
-      ]);
-    } catch {
-      /* окно закрылось или скрипт недоступен — показываем как есть */
-    }
-  } else {
-    // Выход из показа ждать перерисовки не нужно: окно уходит за окно лектора,
-    // requestAnimationFrame в нём засыпает, и handshake упёрся бы в таймаут.
-    await new Promise((r) => setTimeout(r, 80));
+async function revealAudience(win) {
+  const { width, height } = win.getBounds();
+  try {
+    await Promise.race([
+      win.webContents.executeJavaScript(
+        `window.__podiumPrepare ? window.__podiumPrepare(${width}, ${height}) : null`,
+        true,
+      ),
+      // Страховка: renderer мог ещё не загрузиться или зависнуть на рендере.
+      new Promise((r) => setTimeout(r, 600)),
+    ]);
+  } catch {
+    /* окно закрылось или скрипт недоступен — показываем как есть */
   }
   if (!win || win.isDestroyed()) return;
   win.setOpacity(1);
-  if (focus) {
-    win.moveTop();
-    win.focus();
-  }
+  win.moveTop();
+  win.focus();
 }
 
 function enterPresentationFullscreen(win, display) {
@@ -140,7 +132,7 @@ function enterPresentationFullscreen(win, display) {
   win.setAlwaysOnTop(true, 'screen-saver');
 
   // Фокус сразу на полноэкранном окне: кликер и клавиши бьют в показ.
-  revealAudience(win, { focus: true, awaitPaint: true });
+  revealAudience(win);
 }
 
 function exitPresentationFullscreen(win, display) {
@@ -154,8 +146,10 @@ function exitPresentationFullscreen(win, display) {
   if (IS_MAC) win.setSimpleFullScreen(false);
   else win.setFullScreen(false);
   if (display) centerOn(win, display, 0.5);
-
-  revealAudience(win, { focus: false, awaitPaint: false });
+  win.hide();
+  // Прозрачность возвращаем: иначе окно, показанное потом вручную, окажется
+  // невидимым — setOpacity переживает hide.
+  win.setOpacity(1);
 }
 
 function isFullscreenNow(win) {
@@ -164,10 +158,10 @@ function isFullscreenNow(win) {
 }
 
 /**
- * Приводит окна в соответствие с выбранными дисплеями.
- * @param {{autoFullscreen?: boolean}} opts
+ * Приводит окна в соответствие с выбранными дисплеями. Показ отсюда никогда
+ * не запускается: окно зрителей появляется только по команде «Показ».
  */
-function applyDisplayLayout({ autoFullscreen = false } = {}) {
+function applyDisplayLayout() {
   const all = screen.getAllDisplays();
   state.displayCount = all.length;
   refreshDisplays();
@@ -187,7 +181,6 @@ function applyDisplayLayout({ autoFullscreen = false } = {}) {
 
   const presenterDisplay = displayById(state.presenterDisplayId);
   const audienceDisplay = displayById(state.audienceDisplayId);
-  const separate = state.presenterDisplayId !== state.audienceDisplayId;
 
   // Двигаем окно, только если оно оказалось не на своём дисплее: иначе каждое
   // display-metrics-changed (смена разрешения, масштаба) сбрасывало бы размер
@@ -208,8 +201,6 @@ function applyDisplayLayout({ autoFullscreen = false } = {}) {
       if (isMisplaced(audienceWin, audienceDisplay)) {
         enterPresentationFullscreen(audienceWin, audienceDisplay);
       }
-    } else if (separate && autoFullscreen) {
-      enterPresentationFullscreen(audienceWin, audienceDisplay);
     } else if (isMisplaced(audienceWin, audienceDisplay)) {
       centerOn(audienceWin, audienceDisplay, 0.5);
     }
@@ -277,14 +268,11 @@ function createWindows() {
   centerOn(audienceWin, audienceDisplay, 0.5);
   audienceWin.loadFile(path.join(RENDERER, 'audience.html'));
   audienceWin.once('ready-to-show', () => {
-    // Внешний экран есть — разворачиваем сразу на него, минуя показ в размере
-    // превью: иначе на старте видно, как окно растягивается.
-    if (state.presenterDisplayId !== state.audienceDisplayId) {
-      enterPresentationFullscreen(audienceWin, displayById(state.audienceDisplayId));
-    } else {
-      audienceWin.show();
-      presenterWin?.focus();
-    }
+    // Окно зрителей на старте не показываем вовсе: оно появляется только по
+    // «Показ» (F5). Иначе второе окно всплывает поверх рабочего стола ещё до
+    // того, как докладчик к нему готов. Открыть его заранее можно вручную —
+    // пункт «Показать/скрыть окно зрителей» в меню.
+    presenterWin?.focus();
     broadcast();
   });
   audienceWin.on('close', (e) => {
@@ -627,9 +615,8 @@ app.whenReady().then(() => {
   createWindows();
   buildMenu();
 
-  const relayout = () => applyDisplayLayout({ autoFullscreen: true });
-  screen.on('display-added', relayout);
-  screen.on('display-removed', relayout);
+  screen.on('display-added', () => applyDisplayLayout());
+  screen.on('display-removed', () => applyDisplayLayout());
   screen.on('display-metrics-changed', () => applyDisplayLayout());
 
   if (pendingFiles.length) {
