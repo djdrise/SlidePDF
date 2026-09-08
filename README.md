@@ -73,7 +73,9 @@ git tag v0.1.0 && git push origin v0.1.0
 ## How the screens work
 
 The audience window does not appear on startup at all — only on “Present”
-(<kbd>F5</kbd>), and it leaves the screen once the show ends. To see beforehand
+(<kbd>F5</kbd>), and it leaves the screen once the show ends. With no file open
+the show does not start at all — the button and the menu item are disabled,
+otherwise the projector would get the “open a file” prompt. To see beforehand
 what the room will see, open it by hand: “Show / hide audience window” in the
 menu.
 

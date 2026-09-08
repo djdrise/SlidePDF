@@ -44,7 +44,17 @@ function docById(id) {
   return state.docs.find((d) => d.id === id) || null;
 }
 
+/** Пункт меню «Показ» гаснет вместе с кнопкой, когда показывать нечего. */
+let menuHasDoc = null;
+function syncMenu() {
+  const has = Boolean(activeDoc());
+  if (has === menuHasDoc) return;
+  menuHasDoc = has;
+  buildMenu();
+}
+
 function broadcast() {
+  syncMenu();
   const payload = {
     ...state,
     docs: state.docs.map((d) => ({ ...d })),
@@ -458,6 +468,9 @@ const commands = {
       commands['audience:exitFullscreen']();
       return;
     }
+    // Пустой показ запускать незачем: на проектор ушло бы приглашение открыть
+    // файл. Выход из показа при этом не блокируем — он выше по коду.
+    if (!activeDoc()) return;
     enterPresentationFullscreen(audienceWin, displayById(state.audienceDisplayId));
   },
 
@@ -559,7 +572,12 @@ function buildMenu() {
     {
       label: 'Показ',
       submenu: [
-        { label: 'Начать / завершить показ', ...hint('F5'), click: send('audience:toggleFullscreen') },
+        {
+          label: 'Начать / завершить показ',
+          ...hint('F5'),
+          enabled: Boolean(activeDoc()),
+          click: send('audience:toggleFullscreen'),
+        },
         { type: 'separator' },
         { label: 'Следующий слайд', ...hint('Right'), click: send('next') },
         { label: 'Предыдущий слайд', ...hint('Left'), click: send('prev') },

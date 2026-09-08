@@ -141,6 +141,12 @@ button.primary {
   cursor: pointer;
 }
 button.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+button.primary:disabled {
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--dim-soft);
+  cursor: default;
+}
 
 button.ghost {
   background: var(--panel); color: var(--dim);

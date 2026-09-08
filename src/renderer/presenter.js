@@ -17,6 +17,7 @@ const els = {
   empty: $('empty'),
   settings: $('settings'),
   displayList: $('display-list'),
+  showBtn: $('btn-fullscreen'),
 };
 
 const currentView = new SlideView($('stage-current'));
@@ -290,6 +291,8 @@ function renderChrome(s) {
 
   // Счётчик прячем целиком, пока считать нечего.
   const doc = s.docs.find((d) => d.id === s.activeId) || null;
+  // Без открытого файла показывать нечего — кнопку гасим.
+  els.showBtn.disabled = !doc;
   els.pages.hidden = !doc || !doc.pageCount;
   if (!els.pages.hidden) els.pages.textContent = `${doc.page} / ${doc.pageCount}`;
 
