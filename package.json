@@ -1,6 +1,6 @@
 {
   "name": "slidepdf",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Cross-platform PDF viewer for conference talks: projector output and a presenter view",
   "main": "src/main/main.js",
   "author": {
@@ -54,6 +54,16 @@
       "target": [
         "dmg",
         "zip"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "pdf",
+          "name": "PDF",
+          "description": "PDF-презентация",
+          "mimeType": "application/pdf",
+          "role": "Viewer",
+          "icon": "assets/file-icon"
+        }
       ]
     },
     "win": {
@@ -61,6 +71,16 @@
       "target": [
         "nsis",
         "portable"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "pdf",
+          "name": "SlidePDF.pdf",
+          "description": "PDF-презентация",
+          "mimeType": "application/pdf",
+          "role": "Viewer",
+          "icon": "assets/file-icon"
+        }
       ]
     },
     "linux": {
@@ -68,18 +88,19 @@
         "AppImage",
         "deb"
       ],
-      "category": "Office"
+      "category": "Office",
+      "description": "Cross-platform PDF viewer for conference talks: projector output and a presenter view",
+      "fileAssociations": [
+        {
+          "ext": "pdf",
+          "name": "PDF",
+          "description": "PDF-презентация",
+          "mimeType": "application/pdf",
+          "role": "Viewer",
+          "icon": "assets/file-icon"
+        }
+      ]
     },
-    "fileAssociations": [
-      {
-        "ext": "pdf",
-        "name": "PDF",
-        "description": "PDF-презентация",
-        "mimeType": "application/pdf",
-        "role": "Viewer",
-        "icon": "assets/file-icon"
-      }
-    ],
     "asar": true,
     "icon": "assets/icon.png",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -91,7 +112,10 @@
     },
     "asarUnpack": [
       "assets/icon.png"
-    ]
+    ],
+    "extraMetadata": {
+      "description": "SlidePDF"
+    }
   },
   "engines": {
     "node": ">=20"
