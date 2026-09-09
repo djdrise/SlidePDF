@@ -138,6 +138,11 @@ again two seconds after the mouse stops moving.
 * The text of the current slide stands in for speaker notes.
 * The slide counter and the screen indicator both appear only when they have
   something to say.
+* Settings offer “reopen last files”: the app remembers the open tabs and brings
+  them back on the next launch, along with the one you left off on. Off by
+  default, and while it is off no paths are written anywhere. Files given on the
+  command line win over saved ones, and files that moved or were deleted are
+  skipped silently.
 
 ## Keys
 
