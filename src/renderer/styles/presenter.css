@@ -187,6 +187,11 @@ button.ghost:hover { color: var(--accent); border-color: var(--accent); }
   text-transform: none; letter-spacing: 0;
   color: var(--warn); background: var(--warn-bg);
   padding: 2px 8px; border-radius: 999px; font-weight: 600;
+  /* Отрицательные поля гасят вклад набивки в высоту строки. Иначе появление
+     подписи поднимало шапку на 4 пикселя, область слайда на столько же
+     сжималась, канва перерисовывалась — и предпросмотр заметно дёргался при
+     каждом нажатии B или F. */
+  margin-block: -2px;
 }
 .flag[hidden] { display: none !important; }
 
