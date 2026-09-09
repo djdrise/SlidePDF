@@ -1,0 +1,9 @@
+<!-- Значок PDF-файла: страница с загнутым углом и коралловой надписью.
+     Исходник для assets/file-icon.png, .ico и .icns. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <path d="M280 96H632L792 256V928a48 48 0 0 1-48 48H280a48 48 0 0 1-48-48V144a48 48 0 0 1 48-48Z" fill="#ffffff"/>
+  <path d="M280 96H632L792 256V928a48 48 0 0 1-48 48H280a48 48 0 0 1-48-48V144a48 48 0 0 1 48-48Z" fill="none" stroke="#dfe3e8" stroke-width="8"/>
+  <path d="M632 96 792 256H680a48 48 0 0 1-48-48Z" fill="#f0f2f5" stroke="#dfe3e8" stroke-width="8" stroke-linejoin="round"/>
+  <text x="512" y="742" text-anchor="middle" font-family="-apple-system, Segoe UI, Roboto, system-ui, sans-serif"
+        font-size="196" font-weight="700" fill="#e0402f" letter-spacing="-6">PDF</text>
+</svg>

@@ -1,32 +1,48 @@
 #!/usr/bin/env node
 'use strict';
 
-// Собирает иконки приложения из SVG силами Chromium: сторонних конвертеров SVG
-// в системе может не быть, а Electron уже установлен. Скрипт самозапускается —
-// под обычным Node он перезапускает себя в Electron.
+// Собирает значки приложения и PDF-файла из SVG силами Chromium: сторонних
+// конвертеров SVG в системе может не быть, а Electron уже установлен.
+// Скрипт самозапускается — под обычным Node он перезапускает себя в Electron.
 //
-//   assets/icon.png  1024×1024 — из неё electron-builder делает .icns для macOS
-//   assets/icon.ico  16…256    — для Windows собираем сами
+//   assets/icon.png        1024×1024, из неё electron-builder делает .icns
+//   assets/icon.ico        16…256 для Windows
+//   assets/file-icon.png   1024×1024
+//   assets/file-icon.ico   16…256, значок PDF в проводнике Windows
+//   assets/file-icon.icns  16…1024, значок PDF в Finder (собирается только на macOS)
 //
-// Свой .ico нужен потому, что electron-builder ужимает одну картинку 1024×1024
-// до всех размеров сразу. Уменьшение в 64 раза размывает тонкие детали, а на
-// 16 пикселях Windows показывает иконку в заголовке окна и в панели задач.
-// Здесь каждый размер растрируется из вектора отдельно, а мелкие — из
-// упрощённого знака icon-small.svg.
+// Свои .ico и .icns нужны потому, что electron-builder ужимает одну картинку
+// 1024×1024 до всех размеров сразу, а уменьшение в 64 раза размывает детали.
+// Здесь каждый размер растрируется из вектора отдельно, в натуральную величину,
+// а мелкие — из упрощённых исходников: на 16 пикселях наклон даёт «лесенку»,
+// тонкие элементы пропадают, а надпись «PDF» превращается в грязь.
 
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
-const SVG_BIG = path.join(ROOT, 'assets', 'icon.svg');
-const SVG_SMALL = path.join(ROOT, 'assets', 'icon-small.svg');
-const PNG = path.join(ROOT, 'assets', 'icon.png');
-const ICO = path.join(ROOT, 'assets', 'icon.ico');
+const ASSETS = path.join(ROOT, 'assets');
+
+/** Наборы: крупный исходник, упрощённый для мелких размеров и куда писать. */
+const ICONS = {
+  app: { big: 'icon.svg', small: 'icon-small.svg', png: 'icon.png', ico: 'icon.ico' },
+  file: {
+    big: 'file-icon.svg',
+    small: 'file-icon-small.svg',
+    png: 'file-icon.png',
+    ico: 'file-icon.ico',
+    icns: 'file-icon.icns',
+  },
+};
 
 const PNG_SIZE = 1024;
-/** Размеры внутри .ico. Windows берёт 16 и 24 для заголовка, 32 и 48 — для панели задач. */
+/** Размеры внутри .ico: 16 и 24 Windows берёт для списка файлов, 32 и 48 — для крупных значков. */
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
-/** До какого размера включительно рисуем упрощённым знаком. */
+/** Размеры внутри .icns, как их ждёт iconutil. */
+const ICNS_SIZES = [16, 32, 64, 128, 256, 512, 1024];
+/** До какого размера включительно рисуем упрощённым исходником. */
 const SMALL_UPTO = 32;
 
 if (!process.versions.electron) {
@@ -40,34 +56,91 @@ if (!process.versions.electron) {
   return;
 }
 
-const { app, BrowserWindow } = require('electron');
-
+const { app, BrowserWindow, screen } = require('electron');
 app.disableHardwareAcceleration();
 
+const read = (name) => fs.readFileSync(path.join(ASSETS, name), 'utf8');
+
 /** Инлайним SVG несколько раз на одной странице — id градиента должен быть свой. */
-function svgWithUniqueIds(source, suffix) {
+function unique(source, suffix) {
   return source.replace(/id="tile"/g, `id="tile${suffix}"`).replace(/url\(#tile\)/g, `url(#tile${suffix})`);
 }
 
-/**
- * Страница со всеми нужными размерами в столбик: один кадр, потом нарезаем.
- * Размеры задаём в CSS-пикселях с поправкой на плотность экрана, чтобы в
- * пикселях устройства вышло ровно то, что нужно: SVG растрируется сразу в
- * нужном размере, без единого уменьшения.
- */
-function buildPage(sizes, scale) {
-  const big = fs.readFileSync(SVG_BIG, 'utf8');
-  const small = fs.readFileSync(SVG_SMALL, 'utf8');
-  const blocks = sizes.map((size, i) => {
-    const svg = svgWithUniqueIds(size <= SMALL_UPTO ? small : big, i);
-    const css = size / scale;
-    return `<div class="cell" style="width:${css}px;height:${css}px">${svg}</div>`;
+function sourceFor(kind, size) {
+  const set = ICONS[kind];
+  return read(size <= SMALL_UPTO ? set.small : set.big);
+}
+
+async function capture(html, cssW, cssH) {
+  const win = new BrowserWindow({
+    width: cssW,
+    height: cssH,
+    useContentSize: true,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
   });
-  return `<!doctype html><meta charset="utf-8"><style>
-    html,body{margin:0;padding:0;background:transparent}
-    .cell{overflow:hidden}
-    .cell svg{display:block;width:100%;height:100%}
-  </style>${blocks.join('')}`;
+  await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  await win.webContents.executeJavaScript(
+    'new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(1))))',
+  );
+  const image = await win.webContents.capturePage();
+  win.destroy();
+  return image;
+}
+
+/**
+ * Рисует всё одним кадром и нарезает. Размеры задаём в CSS-пикселях с поправкой
+ * на плотность экрана, чтобы в пикселях устройства вышло ровно то, что нужно:
+ * SVG растрируется сразу в нужном размере, без единого уменьшения.
+ *
+ * Всё в одном окне не для красоты: в песочнице этой машины второе окно Electron
+ * не поднимается (mach_port_rendezvous: Permission denied), и разбивка на два
+ * кадра просто не работает.
+ */
+async function renderAll(cells, scale) {
+  const cell = (kind, size, id) => {
+    const svg = unique(sourceFor(kind, size), id).replace(
+      /width="1024" height="1024"/,
+      'width="100%" height="100%"',
+    );
+    const css = size / scale;
+    return `<div style="width:${css}px;height:${css}px;overflow:hidden">${svg}</div>`;
+  };
+
+  const stripHeight = cells.reduce((a, c) => a + c.size, 0);
+  const stripWidth = Math.max(...cells.map((c) => c.size));
+  const sheetWidth = PNG_SIZE * 2 + stripWidth;
+  const sheetHeight = Math.max(PNG_SIZE, stripHeight);
+
+  const html = `<!doctype html><meta charset="utf-8"><style>
+    html,body{margin:0;background:transparent}
+    .row{display:flex;align-items:flex-start}
+    .col{display:flex;flex-direction:column}
+    div svg{display:block}
+  </style>
+  <div class="row">
+    ${cell('app', PNG_SIZE, 'A')}
+    ${cell('file', PNG_SIZE, 'F')}
+    <div class="col">${cells.map((c, i) => cell(c.kind, c.size, i)).join('')}</div>
+  </div>`;
+
+  const sheet = await capture(html, sheetWidth / scale, sheetHeight / scale);
+  const got = sheet.getSize();
+  if (got.width !== sheetWidth || got.height !== sheetHeight) {
+    throw new Error(`кадр ${got.width}×${got.height}, ожидался ${sheetWidth}×${sheetHeight}`);
+  }
+
+  const out = new Map();
+  out.set(`app:${PNG_SIZE}`, sheet.crop({ x: 0, y: 0, width: PNG_SIZE, height: PNG_SIZE }));
+  out.set(`file:${PNG_SIZE}`, sheet.crop({ x: PNG_SIZE, y: 0, width: PNG_SIZE, height: PNG_SIZE }));
+  let y = 0;
+  for (const { kind, size } of cells) {
+    out.set(`${kind}:${size}`, sheet.crop({ x: PNG_SIZE * 2, y, width: size, height: size }));
+    y += size;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,88 +197,80 @@ function packIco(entries) {
   return Buffer.concat([header, dir, ...entries.map((e) => e.data)]);
 }
 
+function writeIco(file, images) {
+  const entries = ICO_SIZES.map((size) => ({
+    size,
+    // 256 кладём как PNG — так принято и файл меньше; мелкие как DIB,
+    // их читают вообще все версии Windows.
+    data: size === 256 ? images.get(size).toPNG() : dibFromBgra(images.get(size).toBitmap(), size),
+  }));
+  fs.writeFileSync(file, packIco(entries));
+}
+
+/** .icns собирает системный iconutil — он есть только на macOS. */
+function writeIcns(file, images) {
+  if (process.platform !== 'darwin') {
+    console.log('assets/file-icon.icns — пропущено: iconutil есть только на macOS');
+    return false;
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iconset-')) + '.iconset';
+  fs.mkdirSync(dir, { recursive: true });
+  const pairs = [
+    [16, 'icon_16x16.png'], [32, 'icon_16x16@2x.png'],
+    [32, 'icon_32x32.png'], [64, 'icon_32x32@2x.png'],
+    [128, 'icon_128x128.png'], [256, 'icon_128x128@2x.png'],
+    [256, 'icon_256x256.png'], [512, 'icon_256x256@2x.png'],
+    [512, 'icon_512x512.png'], [1024, 'icon_512x512@2x.png'],
+  ];
+  for (const [size, name] of pairs) {
+    fs.writeFileSync(path.join(dir, name), images.get(size).toPNG());
+  }
+  execFileSync('iconutil', ['-c', 'icns', dir, '-o', file]);
+  fs.rmSync(dir, { recursive: true, force: true });
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 
 async function build() {
-  const { screen } = require('electron');
   const scale = screen.getPrimaryDisplay().scaleFactor || 1;
-  const sizes = ICO_SIZES;
-  const totalHeight = sizes.reduce((a, b) => a + b, 0);
-  const width = Math.max(...sizes);
-  for (const size of sizes) {
+
+  const appSizes = [...ICO_SIZES].sort((a, b) => a - b);
+  const fileSizes = [...new Set([...ICO_SIZES, ...ICNS_SIZES])]
+    .filter((s) => s < PNG_SIZE)
+    .sort((a, b) => a - b);
+  const cells = [
+    ...appSizes.map((size) => ({ kind: 'app', size })),
+    ...fileSizes.map((size) => ({ kind: 'file', size })),
+  ];
+  for (const { size } of [...cells, { size: PNG_SIZE }]) {
     if (!Number.isInteger(size / scale)) {
       throw new Error(`размер ${size} не делится на плотность экрана ${scale} без остатка`);
     }
   }
 
-  const win = new BrowserWindow({
-    width: width / scale,
-    height: totalHeight / scale,
-    useContentSize: true,
-    show: false,
-    frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-  });
-  await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(buildPage(sizes, scale)));
-  await win.webContents.executeJavaScript(
-    'new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(1))))',
-  );
+  const shots = await renderAll(cells, scale);
+  const appImages = new Map(appSizes.map((s) => [s, shots.get(`app:${s}`)]));
+  const fileImages = new Map(fileSizes.map((s) => [s, shots.get(`file:${s}`)]));
+  fileImages.set(PNG_SIZE, shots.get(`file:${PNG_SIZE}`));
 
-  const sheet = await win.webContents.capturePage();
-  const sheetSize = sheet.getSize();
-  console.log(`плотность экрана ${scale}, кадр ${sheetSize.width}×${sheetSize.height} (ожидался ${width}×${totalHeight})`);
-  if (sheetSize.width !== width || sheetSize.height !== totalHeight) {
-    throw new Error('масштаб кадра не совпал: нарезка дала бы не те пиксели');
-  }
+  fs.writeFileSync(path.join(ASSETS, ICONS.app.png), shots.get(`app:${PNG_SIZE}`).toPNG());
+  writeIco(path.join(ASSETS, ICONS.app.ico), appImages);
+  fs.writeFileSync(path.join(ASSETS, ICONS.file.png), shots.get(`file:${PNG_SIZE}`).toPNG());
+  writeIco(path.join(ASSETS, ICONS.file.ico), fileImages);
+  const icns = writeIcns(path.join(ASSETS, ICONS.file.icns), fileImages);
 
-  const entries = [];
-  let y = 0;
-  for (const size of sizes) {
-    const crop = sheet.crop({ x: 0, y, width: size, height: size });
-    y += size;
-    // 256 кладём как PNG — так принято и файл меньше; мелкие как DIB, их
-    // читают вообще все версии Windows.
-    entries.push({
-      size,
-      data: size === 256 ? crop.toPNG() : dibFromBgra(crop.toBitmap(), size),
-    });
-  }
-  fs.writeFileSync(ICO, packIco(entries));
-
-  // Крупная картинка для macOS и Linux — отдельным кадром в натуральную величину.
-  const bigWin = new BrowserWindow({
-    width: PNG_SIZE / scale,
-    height: PNG_SIZE / scale,
-    useContentSize: true,
-    show: false,
-    frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-  });
-  const bigSvg = fs.readFileSync(SVG_BIG, 'utf8');
-  await bigWin.loadURL(
-    'data:text/html;charset=utf-8,' +
-      encodeURIComponent(
-        `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:transparent}
-         svg{display:block;width:${PNG_SIZE / scale}px;height:${PNG_SIZE / scale}px}</style>${bigSvg}`,
-      ),
-  );
-  await bigWin.webContents.executeJavaScript(
-    'new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(1))))',
-  );
-  const bigImage = await bigWin.webContents.capturePage();
-  fs.writeFileSync(PNG, bigImage.toPNG());
-
-  console.log(`assets/icon.png — ${bigImage.getSize().width}×${bigImage.getSize().height}`);
-  console.log(`assets/icon.ico — размеры: ${sizes.join(', ')}`);
+  console.log(`плотность экрана ${scale}`);
+  console.log(`assets/icon.png, assets/file-icon.png — ${PNG_SIZE}×${PNG_SIZE}`);
+  console.log(`assets/icon.ico, assets/file-icon.ico — размеры: ${ICO_SIZES.join(', ')}`);
+  if (icns) console.log(`assets/file-icon.icns — размеры: ${ICNS_SIZES.join(', ')}`);
 }
 
 app.whenReady().then(async () => {
   try {
     await build();
   } catch (err) {
-    console.error('сборка иконок не удалась:', err.message);
+    console.error('сборка значков не удалась:', err.message);
     process.exitCode = 1;
   } finally {
     app.quit();

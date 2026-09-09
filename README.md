@@ -171,11 +171,16 @@ is coral — in a taskbar where almost everything is blue and grey, a warm colou
 stands out.
 
 ```
-assets/logo.svg        the mark for the interface (two-tone, on a light background)
-assets/icon.svg        the app icon — a white mark on a blue tile
-assets/icon-small.svg  a simplified mark for the small icon sizes
-assets/icon.png        1024×1024, electron-builder turns it into .icns for macOS
-assets/icon.ico        16…256 for Windows, built here
+assets/logo.svg             the mark for the interface (two-tone, on a light background)
+assets/icon.svg             the app icon — a white mark on a coral tile
+assets/icon-small.svg       a simplified mark for the small icon sizes
+assets/icon.png             1024×1024, electron-builder turns it into .icns
+assets/icon.ico             16…256 for Windows
+assets/file-icon.svg        the PDF file icon — a page with a label
+assets/file-icon-small.svg  a simplified file icon for 16–32 px
+assets/file-icon.png        1024×1024
+assets/file-icon.ico        16…256, the file icon in Windows Explorer
+assets/file-icon.icns       16…1024, the file icon in Finder
 ```
 
 `npm run icon` rebuilds both images from the SVGs using Chromium: a standalone
@@ -183,12 +188,25 @@ SVG converter may be missing from the system, while Electron is already
 installed. The script bootstraps itself — under plain Node it re-spawns itself
 in Electron.
 
-The Windows `.ico` is built here rather than left to electron-builder: that one
-squeezes a single 1024×1024 image down to every size at once, and a 64× downscale
-smears the detail away. Here each size is rasterised from the vector separately,
-at its natural size, and 16, 24 and 32 pixels come from `icon-small.svg`: two
-cards instead of three and a larger offset, because at 16 pixels the third card
-shifts by less than a pixel and merges with its neighbour.
+The `.ico` and `.icns` files are built here rather than left to electron-builder:
+that one squeezes a single 1024×1024 image down to every size at once, and a 64×
+downscale smears the detail away. Here each size is rasterised from the vector
+separately, at its natural size, and the small ones come from simplified sources.
+For the app icon that means two cards instead of three with a larger offset: at
+16 pixels the third card shifts by less than a pixel and merges with its
+neighbour. For the file icon the “PDF” label gives way to a solid band — three
+letters across eight dots turn to mud.
+
+## PDF file association
+
+The installer registers the app as a PDF viewer, so files open on a double click
+or through “Open with”. It works on all three systems: macOS delivers the file
+through the `open-file` event, Windows and Linux as a command-line argument.
+Launching again with a file does not spawn a second window — the file goes to the
+running one as a new tab.
+
+The app declares itself a viewer, not the owner of the format: it does not take
+PDFs away from the system viewer, the choice stays yours.
 
 ## Layout
 

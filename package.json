@@ -74,7 +74,10 @@
       {
         "ext": "pdf",
         "name": "PDF",
-        "role": "Viewer"
+        "description": "PDF-презентация",
+        "mimeType": "application/pdf",
+        "role": "Viewer",
+        "icon": "assets/file-icon"
       }
     ],
     "asar": true,
