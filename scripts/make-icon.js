@@ -200,9 +200,13 @@ function packIco(entries) {
 function writeIco(file, images) {
   const entries = ICO_SIZES.map((size) => ({
     size,
-    // 256 кладём как PNG — так принято и файл меньше; мелкие как DIB,
-    // их читают вообще все версии Windows.
-    data: size === 256 ? images.get(size).toPNG() : dibFromBgra(images.get(size).toBitmap(), size),
+    // От 128 и выше кладём PNG, ниже — DIB, его читают вообще все версии
+    // Windows. Дело не только в размере файла: app-builder, вшивая значок в
+    // .exe, пишет длину записи в 16 бит, и всё, что больше 65535 байт,
+    // обрезается. DIB 128×128 весит 67624 байта и попадал ровно под это —
+    // в ресурсах .exe длина превращалась в 2088, и значок такого размера
+    // не читался. PNG-версия весит единицы килобайт и под ограничение не идёт.
+    data: size >= 128 ? images.get(size).toPNG() : dibFromBgra(images.get(size).toBitmap(), size),
   }));
   fs.writeFileSync(file, packIco(entries));
 }

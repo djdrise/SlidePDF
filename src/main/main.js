@@ -706,6 +706,12 @@ app.on('open-file', (e, filePath) => {
   else pendingFiles.push(filePath);
 });
 
+// Windows связывает окно с ярлыком по этому идентификатору. Он должен
+// совпадать с appId из package.json: ярлыку его прописывает установщик, и
+// без такой же строки у запущенной программы система считает окно чужим —
+// в панели задач появляется отдельная кнопка с системным значком вместо нашего.
+if (process.platform === 'win32') app.setAppUserModelId('dev.pautov.slidepdf');
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
