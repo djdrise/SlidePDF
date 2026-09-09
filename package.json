@@ -84,6 +84,7 @@
       ]
     },
     "linux": {
+      "synopsis": "PDF viewer for conference talks with a presenter view",
       "target": [
         "AppImage",
         "deb"
