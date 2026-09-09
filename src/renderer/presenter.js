@@ -18,6 +18,7 @@ const els = {
   empty: $('empty'),
   settings: $('settings'),
   displayList: $('display-list'),
+  reopenLast: $('reopen-last'),
   showBtn: $('btn-fullscreen'),
 };
 
@@ -319,6 +320,8 @@ function renderChrome(s) {
 
   // Счётчик прячем целиком, пока считать нечего.
   const doc = s.docs.find((d) => d.id === s.activeId) || null;
+  els.reopenLast.checked = Boolean(s.reopenLast);
+
   // Без открытого файла показывать нечего — кнопку гасим.
   els.showBtn.disabled = !doc;
   els.pages.hidden = !doc || !doc.pageCount;
@@ -458,6 +461,8 @@ $('btn-fullscreen').addEventListener('click', () => window.deck.cmd('audience:to
 $('btn-overview').addEventListener('click', () => (overviewOpen ? closeOverview() : openOverview()));
 $('btn-settings').addEventListener('click', () => (settingsOpen ? closeSettings() : openSettings()));
 $('settings-close').addEventListener('click', closeSettings);
+els.reopenLast.addEventListener('change', (e) =>
+  window.deck.cmd('settings:set', { reopenLast: e.target.checked }));
 els.settings.addEventListener('click', (e) => {
   // Клик мимо карточки закрывает окно.
   if (e.target === els.settings) closeSettings();

@@ -352,6 +352,25 @@ kbd {
 }
 .field-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.45; color: var(--dim); }
 
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+  user-select: none;
+}
+.checkbox:hover { border-color: var(--dim-soft); }
+.checkbox input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .display-list { display: grid; gap: 6px; }
 .display-option {
   display: flex; align-items: center; gap: 10px;

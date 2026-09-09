@@ -3,6 +3,7 @@
 const { app, BrowserWindow, ipcMain, dialog, screen, Menu, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const fsSync = require('node:fs');
 const { clampPage, nextTabId, tabAfterClose, chooseLayout } = require('./lib/deck');
 const { planLayout, centeredBounds } = require('./lib/layout');
 
@@ -32,6 +33,8 @@ const state = {
    * @type {{docId: string, page: number}|null}
    */
   freeze: null,
+  /** Открывать вкладки прошлого запуска. Настройка из окна настроек. */
+  reopenLast: false,
   /** Список экранов для окна настроек. */
   displays: [],
   /** Экран показа выбран вручную — автоматика его больше не переназначает. */
@@ -60,6 +63,34 @@ function syncMenu() {
   if (has === menuHasDoc) return;
   menuHasDoc = has;
   buildMenu();
+}
+
+// Настройки переживают перезапуск: лежат рядом с остальными данными программы.
+const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
+
+function loadSettings() {
+  try {
+    const saved = JSON.parse(fsSync.readFileSync(settingsFile(), 'utf8'));
+    state.reopenLast = Boolean(saved.reopenLast);
+    return Array.isArray(saved.files) ? saved : { files: [], activePath: null };
+  } catch {
+    // Файла ещё нет или он испорчен — остаёмся на значениях по умолчанию.
+    return { files: [], activePath: null };
+  }
+}
+
+function saveSettings() {
+  // Пути запоминаем только при включённой опции: выключил — программа и не
+  // помнит, что вы открывали.
+  const active = activeDoc();
+  const data = state.reopenLast
+    ? { reopenLast: true, files: state.docs.map((d) => d.path), activePath: active ? active.path : null }
+    : { reopenLast: false };
+  try {
+    fsSync.writeFileSync(settingsFile(), JSON.stringify(data, null, 2));
+  } catch {
+    /* не смогли сохранить — на работу программы это не влияет */
+  }
 }
 
 function broadcast() {
@@ -342,7 +373,7 @@ function createWindows() {
 // ---------------------------------------------------------------------------
 // Вкладки
 // ---------------------------------------------------------------------------
-async function openPath(filePath) {
+async function openPath(filePath, { silent = false } = {}) {
   if (!filePath) return;
   const full = path.resolve(filePath);
 
@@ -354,7 +385,9 @@ async function openPath(filePath) {
     const stats = await fs.stat(full);
     key = `${stats.dev}:${stats.ino}`;
   } catch (err) {
-    dialog.showErrorBox('Не удалось открыть файл', `${full}\n\n${err.message}`);
+    // При восстановлении вкладок файл мог переехать или исчезнуть — молча
+    // пропускаем, диалог на каждый такой файл только раздражал бы на старте.
+    if (!silent) dialog.showErrorBox('Не удалось открыть файл', `${full}\n\n${err.message}`);
     return;
   }
 
@@ -379,6 +412,7 @@ async function openPath(filePath) {
   state.activeId = doc.id;
   state.blank = 'none';
   app.addRecentDocument(full);
+  saveSettings();
   broadcast();
 }
 
@@ -494,7 +528,17 @@ const commands = {
   },
   'tab:next': () => stepTab(1),
   'tab:prev': () => stepTab(-1),
-  'tab:close': ({ id }) => closeDoc(id || state.activeId),
+  'tab:close': ({ id }) => {
+    closeDoc(id || state.activeId);
+    saveSettings();
+  },
+
+  /** Галочка «открывать последние файлы» из окна настроек. */
+  'settings:set': ({ reopenLast }) => {
+    if (typeof reopenLast !== 'boolean' || reopenLast === state.reopenLast) return;
+    state.reopenLast = reopenLast;
+    saveSettings();
+  },
 
   'audience:toggleFullscreen': () => {
     if (!audienceWin || audienceWin.isDestroyed()) return;
@@ -676,6 +720,7 @@ app.on('before-quit', () => {
 });
 
 app.whenReady().then(() => {
+  const saved = loadSettings();
   createWindows();
   buildMenu();
 
@@ -683,13 +728,22 @@ app.whenReady().then(() => {
   screen.on('display-removed', () => applyDisplayLayout());
   screen.on('display-metrics-changed', () => applyDisplayLayout());
 
-  if (pendingFiles.length) {
+  // Файлы из командной строки важнее сохранённых: пользователь открыл их сам.
+  const restore = pendingFiles.length ? pendingFiles : state.reopenLast ? saved.files : [];
+  const silent = pendingFiles.length === 0;
+  if (restore.length) {
     // Даём окнам дойти до did-finish-load, иначе состояние уйдёт в пустоту.
     const ready = [presenterWin, audienceWin].map(
       (w) => new Promise((res) => w.webContents.once('did-finish-load', res)),
     );
     Promise.all(ready).then(async () => {
-      for (const f of pendingFiles) await openPath(f);
+      for (const f of restore) await openPath(f, { silent });
+      // Возвращаем ту вкладку, на которой закончили прошлый раз.
+      if (silent && saved.activePath) {
+        const doc = state.docs.find((d) => d.path === path.resolve(saved.activePath));
+        if (doc) state.activeId = doc.id;
+      }
+      broadcast();
     });
   }
 
