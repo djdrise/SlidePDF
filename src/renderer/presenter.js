@@ -1,4 +1,5 @@
 import { loadDoc, SlideView, renderThumb, pageText } from './lib/pdfview.js';
+import { RenderQueue } from './lib/renderqueue.js';
 import { bindKeys, bindDropOpen } from './lib/keys.js';
 
 const $ = (id) => document.getElementById(id);
@@ -6,7 +7,9 @@ const $ = (id) => document.getElementById(id);
 const els = {
   tabs: $('tabs'),
   pages: $('pages'),
-  badge: $('display-badge'),
+  chip: $('display-chip'),
+  chipName: $('chip-name'),
+  chipMeta: $('chip-meta'),
   blankFlag: $('blank-flag'),
   freezeFlag: $('freeze-flag'),
   nextNum: $('next-num'),
@@ -41,24 +44,71 @@ let lastDisplaysKey = '';
 let settingsOpen = false;
 
 // ---------------------------------------------------------------------------
-// Полоса миниатюр — порядок слайдов. Рендерится лениво, по мере прокрутки.
+// Полоса миниатюр — порядок слайдов. Рендерится лениво, по мере прокрутки,
+// и обязательно по одной за раз: см. lib/renderqueue.js.
 // ---------------------------------------------------------------------------
+
+/** Одна очередь на полосу и на сетку, чтобы они не отбирали время друг у друга. */
+const thumbQueue = new RenderQueue(1);
+
+/** Насколько далеко от видимой области миниатюру ещё имеет смысл рисовать. */
+const NEAR_MARGIN = 600;
+
+/** Копия канвы: одну и ту же нельзя показать в двух местах разметки. */
+function copyCanvas(src) {
+  const out = document.createElement('canvas');
+  out.width = src.width;
+  out.height = src.height;
+  out.style.width = src.style.width;
+  out.style.height = src.style.height;
+  out.getContext('2d', { alpha: false }).drawImage(src, 0, 0);
+  return out;
+}
+
 class ThumbGrid {
-  constructor(container, { width, onPick }) {
+  constructor(container, { width, onPick, priority = 0, preview = null }) {
     this.container = container;
     this.width = width;
     this.onPick = onPick;
+    this.priority = priority;
+    /** Откуда взять готовую картинку, пока рисуется своя. */
+    this.preview = preview;
     this.items = [];
     this.observer = null;
     this.pdf = null;
+    /** Страница → отмена начатой отрисовки. */
+    this.jobs = new Map();
+    /** Страница → готовая канва. */
+    this.done = new Map();
   }
 
   clear() {
     this.observer?.disconnect();
     this.observer = null;
+    for (const cancel of this.jobs.values()) cancel();
+    this.jobs.clear();
+    this.done.clear();
     this.container.replaceChildren();
     this.items = [];
     this.pdf = null;
+  }
+
+  /** Готовая миниатюра страницы — сетка берёт её как временную заглушку. */
+  canvasFor(n) {
+    return this.done.get(n) || null;
+  }
+
+  /**
+   * Снимает незаконченные задачи, не теряя уже нарисованного: сетку закрыли,
+   * и её миниатюры больше не нужны — очередь должна вернуться к полосе.
+   */
+  suspend() {
+    for (const [n, cancel] of this.jobs) {
+      cancel();
+      const el = this.items[n - 1];
+      if (el && !this.done.has(n)) this.observer?.observe(el);
+    }
+    this.jobs.clear();
   }
 
   build(pdf, count) {
@@ -95,16 +145,56 @@ class ThumbGrid {
     for (const el of this.items) this.observer.observe(el);
   }
 
-  async _render(el) {
+  _render(el) {
     const n = Number(el.dataset.page);
     const pdf = this.pdf;
-    try {
-      const canvas = await renderThumb(pdf, n, this.width);
-      if (this.pdf !== pdf) return; // вкладку успели переключить
-      el.querySelector('.ph')?.replaceWith(canvas);
-    } catch {
-      /* страница могла не отрисоваться — оставляем заглушку */
-    }
+    if (this.jobs.has(n) || this.done.has(n)) return;
+
+    // Пока рисуется своя, резкая, показываем растянутую из полосы: сетка
+    // открывается сразу с картинками, а не с пустыми плитками.
+    const ready = this.preview?.(n);
+    if (ready) this._place(el, copyCanvas(ready));
+
+    const cancel = thumbQueue.add(
+      async (signal) => {
+        try {
+          // Пока задача ждала очереди, ленту могли пролистнуть далеко вперёд.
+          if (!this._near(el)) {
+            if (this.pdf === pdf) this.observer?.observe(el);
+            return;
+          }
+          const canvas = await renderThumb(pdf, n, this.width, signal);
+          if (!canvas || this.pdf !== pdf) return; // отменили или сменили вкладку
+          this._place(el, canvas);
+          this.done.set(n, canvas);
+        } finally {
+          if (this.jobs.get(n) === cancel) this.jobs.delete(n);
+        }
+      },
+      { priority: this.priority },
+    );
+
+    this.jobs.set(n, cancel);
+  }
+
+  /** Ставит картинку на место заглушки или предыдущей, менее чёткой. */
+  _place(el, canvas) {
+    const old = el.querySelector(':scope > .ph, :scope > canvas');
+    if (old) old.replaceWith(canvas);
+    else el.prepend(canvas);
+  }
+
+  /** Миниатюра рядом с видимой областью — значит, её стоит рисовать. */
+  _near(el) {
+    const root = this.container.getBoundingClientRect();
+    if (!root.width || !root.height) return false; // лента скрыта
+    const r = el.getBoundingClientRect();
+    return (
+      r.bottom > root.top - NEAR_MARGIN &&
+      r.top < root.bottom + NEAR_MARGIN &&
+      r.right > root.left - NEAR_MARGIN &&
+      r.left < root.right + NEAR_MARGIN
+    );
   }
 
   setCurrent(n, { scroll = true, cls = 'current' } = {}) {
@@ -125,6 +215,10 @@ const strip = new ThumbGrid(els.filmstrip, {
 });
 const grid = new ThumbGrid(els.overviewGrid, {
   width: 380,
+  // Сетка открыта поверх всего — она и есть то, на что смотрит лектор,
+  // поэтому её миниатюры уходят в очередь раньше, чем миниатюры полосы.
+  priority: 1,
+  preview: (n) => strip.canvasFor(n),
   onPick: (n) => {
     window.deck.cmd('goto', { page: n });
     closeOverview();
@@ -246,11 +340,30 @@ function useDoc(id, pdf) {
   nextView.setDoc(pdf);
   strip.build(pdf, pdf.numPages);
   grid.clear();
+  setSlideAspect(pdf);
   els.overviewTotal.textContent = String(pdf.numPages);
   closeOverview();
   // Сообщаем каждый раз: документ мог догрузиться уже после того, как активной
   // стала другая вкладка, и тогда main так и не узнал бы его число страниц.
   window.deck.cmd('doc:meta', { id, pageCount: pdf.numPages });
+}
+
+/**
+ * Плитки сетки принимают форму страниц этого документа: у презентации 16/9
+ * они заполнены целиком, у портретного PDF — вытянуты вверх, и в обоих случаях
+ * слайд виден весь, без полей в пол-плитки.
+ */
+function setSlideAspect(pdf) {
+  pdf
+    .getPage(1)
+    .then((page) => {
+      const v = page.getViewport({ scale: 1 });
+      document.documentElement.style.setProperty('--slide-aspect', `${v.width} / ${v.height}`);
+      page.cleanup();
+    })
+    .catch(() => {
+      document.documentElement.style.removeProperty('--slide-aspect');
+    });
 }
 
 async function ensureActive(s) {
@@ -341,11 +454,18 @@ function renderChrome(s) {
   }
   strip.setFrozen(frozenDoc && frozenDoc.id === s.activeId ? s.freeze.page : null);
 
-  // На одном экране сообщать нечего — значок показываем только когда есть внешний.
-  els.badge.hidden = s.displayCount < 2;
-  if (!els.badge.hidden) {
-    els.badge.textContent = s.audienceFullscreen ? 'Показ на внешнем экране' : 'Внешний экран найден';
-    els.badge.classList.toggle('ok', s.audienceFullscreen);
+  // Чип отвечает на вопрос «куда пойдёт показ», а не «нашёлся ли второй экран»:
+  // сам факт наличия внешнего экрана лектору ничего не говорит, а вот какой
+  // именно из них выбран — говорит, и это видно не открывая настройки.
+  const target = s.displays.find((d) => d.id === s.audienceDisplayId);
+  els.chip.hidden = !target;
+  if (target) {
+    els.chipName.textContent = target.label;
+    els.chipMeta.textContent = `${target.width} × ${target.height}`;
+    els.chip.classList.toggle('live', s.audienceFullscreen);
+    els.chip.title = s.audienceFullscreen
+      ? `Идёт показ на «${target.label}»`
+      : `Показ пойдёт на «${target.label}» — выбрать другой можно в настройках`;
   }
 }
 
@@ -397,6 +517,8 @@ function openOverview() {
 function closeOverview() {
   overviewOpen = false;
   els.overview.hidden = true;
+  // Сетки не видно — её недорисованные миниатюры уступают очередь полосе.
+  grid.suspend();
 }
 
 function moveOverviewSel(delta) {

@@ -165,9 +165,19 @@ export class SlideView {
   }
 }
 
-/** Отрисовка страницы в отдельную канву фиксированной ширины (для миниатюр). */
-export async function renderThumb(doc, n, cssWidth) {
+/**
+ * Отрисовка страницы в отдельную канву фиксированной ширины (для миниатюр).
+ * Прерывается по signal: пролистнули ленту дальше — начатый рендер незачем
+ * доводить до конца, он только задерживает те миниатюры, что уже перед глазами.
+ * @returns {Promise<HTMLCanvasElement|null>} null, если работу отменили
+ */
+export async function renderThumb(doc, n, cssWidth, signal) {
+  if (signal?.aborted) return null;
   const page = await doc.getPage(n);
+  if (signal?.aborted) {
+    page.cleanup();
+    return null;
+  }
   const base = page.getViewport({ scale: 1 });
   const ratio = dpr();
   const viewport = page.getViewport({ scale: (cssWidth / base.width) * ratio });
@@ -179,8 +189,19 @@ export async function renderThumb(doc, n, cssWidth) {
   const ctx = canvas.getContext('2d', { alpha: false });
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-  page.cleanup();
+
+  const task = page.render({ canvas, canvasContext: ctx, viewport });
+  const stop = () => task.cancel();
+  signal?.addEventListener('abort', stop, { once: true });
+  try {
+    await task.promise;
+  } catch (err) {
+    if (err?.name === 'RenderingCancelledException') return null;
+    throw err;
+  } finally {
+    signal?.removeEventListener('abort', stop);
+    page.cleanup();
+  }
   return canvas;
 }
 

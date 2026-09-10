@@ -41,7 +41,6 @@ const state = {
   audiencePinned: false,
   presenterDisplayId: null,
   audienceDisplayId: null,
-  displayCount: 1,
   audienceFullscreen: false,
   audienceVisible: false,
 };
@@ -219,7 +218,6 @@ function isFullscreenNow(win) {
  */
 function applyDisplayLayout() {
   const displays = screen.getAllDisplays();
-  state.displayCount = displays.length;
   refreshDisplays();
 
   const plan = planLayout({
@@ -275,7 +273,6 @@ function centerOn(win, display, scale = 0.8) {
 // ---------------------------------------------------------------------------
 function createWindows() {
   Object.assign(state, defaultDisplayLayout());
-  state.displayCount = screen.getAllDisplays().length;
   refreshDisplays();
   const presenterDisplay = displayById(state.presenterDisplayId);
   const audienceDisplay = displayById(state.audienceDisplayId);
@@ -759,3 +756,4 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => app.quit());
+

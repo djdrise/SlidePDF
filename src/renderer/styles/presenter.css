@@ -124,13 +124,26 @@ body {
   color: var(--text);
 }
 .pages[hidden] { display: none !important; }
-.badge {
-  font-size: 11px; padding: 3px 8px; border-radius: 999px;
+/* Чип экрана показа: куда уйдёт демонстрация. Точка загорается на время показа. */
+.chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  font-size: 11px; padding: 3px 9px; border-radius: 999px;
   background: var(--bg); color: var(--dim); border: 1px solid var(--line);
   white-space: nowrap;
 }
-.badge.ok { color: #15803d; background: #ecfdf3; border-color: #bbf7d0; }
-.badge[hidden] { display: none !important; }
+.chip-dot {
+  align-self: center;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--dim-soft);
+}
+.chip-label { text-transform: lowercase; }
+.chip-name { color: var(--text); font-weight: 500; }
+.chip-meta { font-variant-numeric: tabular-nums; }
+.chip-meta::before { content: '·'; margin-right: 5px; }
+.chip.live { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.chip.live .chip-dot { background: var(--accent); }
+.chip.live .chip-name { color: var(--accent); }
+.chip[hidden] { display: none !important; }
 
 button.primary {
   border: 1px solid var(--accent);
@@ -237,7 +250,9 @@ button.ghost:hover { color: var(--accent); border-color: var(--accent); }
   overflow: hidden;
 }
 .thumb canvas { display: block; }
-.thumb .ph { width: 128px; height: 74px; background: var(--stage); }
+/* Заглушка держит форму страницы, чтобы лента не дёргалась, когда
+   миниатюры подставляются одна за другой. */
+.thumb .ph { width: 128px; aspect-ratio: var(--slide-aspect, 16 / 9); height: auto; background: var(--stage); }
 .thumb .num {
   position: absolute; left: 4px; bottom: 4px;
   background: rgba(255, 255, 255, 0.92);
@@ -273,8 +288,22 @@ button.ghost:hover { color: var(--accent); border-color: var(--accent); }
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 14px;
   align-content: start;
+  /* Каждая плитка ровно по своей странице, а не по высоте самой высокой в ряду. */
+  align-items: start;
 }
-.overview-grid .thumb .ph { width: 100%; aspect-ratio: 16 / 9; height: auto; }
+/* Высоту плитки задаёт сама страница: канва остаётся в потоке и отдаёт сетке
+   свою высоту. Заглушка до отрисовки держит те же пропорции, что и документ,
+   поэтому плитки не прыгают, когда миниатюры подставляются одна за другой.
+   Выносить содержимое из потока нельзя: тогда строка сетки не получает высоты,
+   соседние ряды наезжают друг на друга, и от слайда видна только верхняя
+   полоса — так эта сетка и выглядела раньше. */
+/* overflow: clip вместо hidden. hidden делает плитку контейнером прокрутки, и её
+   минимальная высота обнуляется: строка сетки перестаёт быть обязана вмещать
+   миниатюру, ряды наезжают друг на друга, и от слайда видна верхняя полоса —
+   именно так эта сетка и выглядела. clip обрезает по скруглению точно так же,
+   но контейнером прокрутки не делает, и высоту строке задаёт сама страница. */
+.overview-grid .thumb { overflow: clip; }
+.overview-grid .thumb .ph { width: 100%; aspect-ratio: var(--slide-aspect, 16 / 9); height: auto; }
 .overview-grid .thumb canvas { width: 100% !important; height: auto !important; }
 .overview-grid .thumb .num { font-size: 11px; padding: 3px 6px; }
 .overview-grid .thumb.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
