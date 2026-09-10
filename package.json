@@ -1,6 +1,6 @@
 {
   "name": "slidepdf",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Cross-platform PDF viewer for conference talks: projector output and a presenter view",
   "main": "src/main/main.js",
   "author": {
@@ -36,6 +36,7 @@
   },
   "build": {
     "appId": "dev.pautov.slidepdf",
+    "afterPack": "scripts/adhoc-sign.js",
     "productName": "SlidePDF",
     "files": [
       "assets/**/*",

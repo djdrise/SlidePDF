@@ -22,10 +22,13 @@ Prebuilt installers are on the
 (Apple Silicon and Intel separately), `.exe` for Windows (installer and
 portable), `.AppImage` and `.deb` for Linux.
 
-The builds are not code-signed, so the first launch needs a nudge:
+The builds are ad-hoc signed but not notarized by Apple, so the first launch
+needs a nudge:
 
-* **macOS** — right-click the app → “Open”, then confirm. A plain double-click
-  is blocked by Gatekeeper.
+* **macOS** — open System Settings → Privacy & Security, find the message about
+  SlidePDF and click “Open Anyway”. On macOS 14 and earlier, right-clicking the
+  app → “Open” works too. If macOS claims the app is damaged, clear the
+  quarantine flag: `xattr -dr com.apple.quarantine /Applications/SlidePDF.app`
 * **Windows** — SmartScreen warns: “More info” → “Run anyway”.
 * **Linux** — make the AppImage executable: `chmod +x SlidePDF-*.AppImage`.
 
