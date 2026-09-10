@@ -14,14 +14,104 @@ const DOC_OPTS = {
   standardFontDataUrl: new URL('standard_fonts/', BASE).href,
   wasmUrl: new URL('wasm/', BASE).href,
   iccUrl: new URL('iccs/', BASE).href,
+  // Без этого pdf.js, даже читая документ по частям, всё равно дотягивает его
+  // до конца в фоне. Нам это ни к чему: файл лежит на диске рядом, и читать
+  // из него стоит только то, что показываем.
+  disableAutoFetch: true,
 };
 
-/** @param {Uint8Array} bytes */
-export function loadDoc(bytes) {
-  return pdfjs.getDocument({ data: bytes, ...DOC_OPTS }).promise;
+/**
+ * Чтение документа по кускам через главный процесс.
+ *
+ * Штатное чтение по ссылке тут не годится: pdf.js включает запрос диапазонов
+ * только для http-адресов, а файл на диске под такой не подходит. Зато у
+ * библиотеки есть ровно этот приём для встраивания — свой транспорт, который
+ * сам решает, откуда брать байты.
+ */
+class IpcRange extends pdfjs.PDFDataRangeTransport {
+  constructor(id, length) {
+    // progressiveDone: сообщаем сразу, что потока «вдогонку» не будет, —
+    // всё приходит только ответами на запросы кусков.
+    super(length, new Uint8Array(0), true);
+    this.id = id;
+  }
+
+  requestDataRange(begin, end) {
+    window.deck
+      .docRange(this.id, begin, end)
+      .then((chunk) => {
+        if (chunk) this.onDataRange(begin, chunk);
+      })
+      .catch(() => {});
+  }
+}
+
+/**
+ * Загружает документ: либо {id, length} для чтения кусками через главный
+ * процесс, либо {data} с готовыми байтами.
+ * @param {{id?: string, length?: number, data?: Uint8Array}} source
+ */
+export function loadDoc(source) {
+  if (source.data) return pdfjs.getDocument({ data: source.data, ...DOC_OPTS }).promise;
+  const range = new IpcRange(source.id, source.length);
+  return pdfjs.getDocument({ range, ...DOC_OPTS }).promise;
 }
 
 const dpr = () => Math.min(window.devicePixelRatio || 1, 2);
+
+// ---------------------------------------------------------------------------
+// Горячие страницы
+// ---------------------------------------------------------------------------
+// page.cleanup() выбрасывает разобранную страницу, и следующий рендер той же
+// страницы стоит столько же, сколько первый — замер показал ровно те же 17 мс.
+// А одну и ту же страницу мы рисуем не раз: в полосу, в сетку, в крупный слайд.
+// Поэтому несколько последних держим разобранными, а чистим только те, что уже
+// никем не рисуются, — иначе cleanup обрывает чужую отрисовку на полуслове.
+
+const HOT_PAGES = 12;
+const pageCaches = new WeakMap();
+let clock = 0;
+
+/** Берёт страницу и помечает занятой. Освобождать обязательно через release. */
+export async function acquirePage(doc, n) {
+  let cache = pageCaches.get(doc);
+  if (!cache) {
+    cache = new Map();
+    pageCaches.set(doc, cache);
+  }
+  let entry = cache.get(n);
+  if (!entry) {
+    entry = { promise: doc.getPage(n), refs: 0, used: 0 };
+    cache.set(n, entry);
+  }
+  entry.refs += 1;
+  entry.used = ++clock;
+  try {
+    return await entry.promise;
+  } catch (err) {
+    cache.delete(n);
+    entry.refs -= 1;
+    throw err;
+  }
+}
+
+/** Отпускает страницу и вычищает самые давние из незанятых. */
+export function releasePage(doc, n) {
+  const cache = pageCaches.get(doc);
+  const entry = cache?.get(n);
+  if (!entry) return;
+  entry.refs -= 1;
+  if (cache.size <= HOT_PAGES) return;
+
+  const idle = [...cache.entries()]
+    .filter(([, e]) => e.refs <= 0)
+    .sort((a, b) => a[1].used - b[1].used);
+  for (const [num, e] of idle) {
+    if (cache.size <= HOT_PAGES) break;
+    cache.delete(num);
+    e.promise.then((page) => page.cleanup()).catch(() => {});
+  }
+}
 
 /**
  * Один слайд, вписанный в контейнер. Держит две канвы и меняет их местами,
@@ -34,6 +124,8 @@ export class SlideView {
     this.pageNum = 0;
     this.task = null;
     this.seq = 0;
+    /** @type {((n: number, canvas: HTMLCanvasElement, doc: unknown) => void)|null} */
+    this.onRender = null;
 
     this.front = this._makeCanvas();
     this.back = this._makeCanvas();
@@ -116,8 +208,12 @@ export class SlideView {
       this.task = null;
     }
 
-    const page = await this.doc.getPage(n);
-    if (my !== this.seq) return;
+    const doc = this.doc;
+    const page = await acquirePage(doc, n);
+    if (my !== this.seq) {
+      releasePage(doc, n);
+      return;
+    }
 
     const rect = this.container.getBoundingClientRect();
     const base = page.getViewport({ scale: 1 });
@@ -152,7 +248,7 @@ export class SlideView {
       // свою, и обнуление вслепую лишало бы его возможности быть отменённым
       // и обманывало бы redrawNow, будто рисовать больше нечего.
       if (this.task === task) this.task = null;
-      page.cleanup();
+      releasePage(doc, n);
     }
     if (my !== this.seq) return;
 
@@ -162,6 +258,10 @@ export class SlideView {
     this.front = target;
     this.back = old;
     old.style.visibility = 'hidden';
+
+    // Страница уже отрисована — из неё можно сделать миниатюру уменьшением,
+    // не гоняя pdf.js второй раз ради того же самого изображения.
+    this.onRender?.(n, target, doc);
   }
 }
 
@@ -173,9 +273,9 @@ export class SlideView {
  */
 export async function renderThumb(doc, n, cssWidth, signal) {
   if (signal?.aborted) return null;
-  const page = await doc.getPage(n);
+  const page = await acquirePage(doc, n);
   if (signal?.aborted) {
-    page.cleanup();
+    releasePage(doc, n);
     return null;
   }
   const base = page.getViewport({ scale: 1 });
@@ -200,7 +300,7 @@ export async function renderThumb(doc, n, cssWidth, signal) {
     throw err;
   } finally {
     signal?.removeEventListener('abort', stop);
-    page.cleanup();
+    releasePage(doc, n);
   }
   return canvas;
 }
@@ -208,11 +308,13 @@ export async function renderThumb(doc, n, cssWidth, signal) {
 /** Текст страницы — используется как заметки лектора, если их нет отдельно. */
 export async function pageText(doc, n) {
   try {
-    const page = await doc.getPage(n);
-    const content = await page.getTextContent();
-    const out = content.items.map((i) => i.str ?? '').join(' ').replace(/\s+/g, ' ').trim();
-    page.cleanup();
-    return out;
+    const page = await acquirePage(doc, n);
+    try {
+      const content = await page.getTextContent();
+      return content.items.map((i) => i.str ?? '').join(' ').replace(/\s+/g, ' ').trim();
+    } finally {
+      releasePage(doc, n);
+    }
   } catch {
     return '';
   }

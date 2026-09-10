@@ -19,9 +19,9 @@ function getPdf(id) {
   let promise = cache.get(id);
   if (!promise) {
     promise = (async () => {
-      const payload = await window.deck.docBytes(id);
-      if (!payload) throw new Error('нет данных документа');
-      return loadDoc(payload.bytes);
+      const source = await window.deck.docSource(id);
+      if (!source) throw new Error('нет данных документа');
+      return loadDoc({ id: source.id, length: source.length });
     })();
     cache.set(id, promise);
   }

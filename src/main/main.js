@@ -6,6 +6,7 @@ const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const { clampPage, nextTabId, tabAfterClose, chooseLayout } = require('./lib/deck');
 const { planLayout, centeredBounds } = require('./lib/layout');
+const { thumbKey, overBudget } = require('./lib/thumbcache');
 
 const IS_MAC = process.platform === 'darwin';
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
@@ -430,6 +431,7 @@ function closeDoc(id) {
   if (state.freeze && state.freeze.docId === id) state.freeze = null;
   const nextActive = tabAfterClose(state.docs, id, state.activeId);
   state.docs.splice(i, 1);
+  statCache.delete(id);
   if (nextActive !== state.activeId) {
     state.activeId = nextActive;
     state.blank = 'none';
@@ -608,18 +610,117 @@ ipcMain.on('cmd', async (_e, msg) => {
 
 ipcMain.handle('state:get', () => ({ ...state, docs: state.docs.map((d) => ({ ...d })) }));
 
-/** Байты документа по требованию окна: каждое окно рендерит PDF само. */
-ipcMain.handle('doc:bytes', async (_e, id) => {
+/**
+ * Размер документа. Раньше окно получало сами байты: файл читался целиком и
+ * копировался через IPC — и так для каждого из двух окон. Теперь окно узнаёт
+ * только длину, а дальше просит куски по мере надобности, поэтому на большой
+ * презентации показ начинается, не дожидаясь чтения всего файла.
+ */
+ipcMain.handle('doc:source', async (_e, id) => {
   const doc = docById(id);
   if (!doc) return null;
   try {
-    const bytes = await fs.readFile(doc.path);
-    return { id: doc.id, name: doc.name, bytes: new Uint8Array(bytes) };
+    const st = await fs.stat(doc.path);
+    return { id: doc.id, name: doc.name, length: st.size };
   } catch (err) {
     dialog.showErrorBox('Не удалось прочитать файл', `${doc.path}\n\n${err.message}`);
     return null;
   }
 });
+
+/** Кусок документа: ровно то, что запросил pdf.js. */
+ipcMain.handle('doc:range', async (_e, { id, begin, end }) => {
+  const doc = docById(id);
+  if (!doc) return null;
+  let handle;
+  try {
+    handle = await fs.open(doc.path, 'r');
+    const length = Math.max(0, end - begin);
+    const buf = Buffer.alloc(length);
+    const { bytesRead } = await handle.read(buf, 0, length, begin);
+    return new Uint8Array(buf.buffer, buf.byteOffset, bytesRead);
+  } catch {
+    return null;
+  } finally {
+    await handle?.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Кэш миниатюр на диске
+// ---------------------------------------------------------------------------
+// Миниатюры переживают перезапуск: во второй раз та же презентация открывается
+// с уже готовой лентой. Ключ считается от самого файла и его времени, поэтому
+// правленый документ перерисуется сам, без ручной чистки.
+
+const thumbsDir = () => path.join(app.getPath('userData'), 'thumbs');
+/** Данные файла для ключа: без него пришлось бы звать stat на каждую страницу. */
+const statCache = new Map();
+
+async function docStat(doc) {
+  const cached = statCache.get(doc.id);
+  if (cached) return cached;
+  const st = await fs.stat(doc.path);
+  const value = { dev: st.dev, ino: st.ino, mtimeMs: st.mtimeMs, size: st.size };
+  statCache.set(doc.id, value);
+  return value;
+}
+
+ipcMain.handle('thumb:get', async (_e, { id, page, width }) => {
+  const doc = docById(id);
+  if (!doc) return null;
+  try {
+    const file = path.join(thumbsDir(), thumbKey(await docStat(doc), page, width));
+    const data = await fs.readFile(file);
+    // Отметка обращения — по ней потом решаем, что вытеснять.
+    fs.utimes(file, new Date(), new Date()).catch(() => {});
+    return `data:image/jpeg;base64,${data.toString('base64')}`;
+  } catch {
+    return null; // промах кэша — обычное дело, рисуем заново
+  }
+});
+
+let writesSinceSweep = 0;
+
+ipcMain.handle('thumb:put', async (_e, { id, page, width, dataUrl }) => {
+  const doc = docById(id);
+  if (!doc || typeof dataUrl !== 'string') return false;
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  try {
+    const dir = thumbsDir();
+    await fs.mkdir(dir, { recursive: true });
+    const file = path.join(dir, thumbKey(await docStat(doc), page, width));
+    await fs.writeFile(file, Buffer.from(base64, 'base64'));
+    if ((writesSinceSweep += 1) >= 200) {
+      writesSinceSweep = 0;
+      sweepThumbs().catch(() => {});
+    }
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+/** Держит каталог в рамках бюджета, удаляя давно не нужные миниатюры. */
+async function sweepThumbs() {
+  const dir = thumbsDir();
+  let names;
+  try {
+    names = await fs.readdir(dir);
+  } catch {
+    return;
+  }
+  const files = [];
+  for (const name of names) {
+    try {
+      const st = await fs.stat(path.join(dir, name));
+      files.push({ name, size: st.size, atimeMs: st.atimeMs });
+    } catch {}
+  }
+  for (const name of overBudget(files)) {
+    await fs.unlink(path.join(dir, name)).catch(() => {});
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Меню
@@ -723,6 +824,10 @@ app.on('before-quit', () => {
 });
 
 app.whenReady().then(() => {
+  // Кэш миниатюр мог разрастись за прошлые запуски — подрезаем его один раз
+  // на старте, чтобы не делать это во время показа.
+  sweepThumbs().catch(() => {});
+
   const saved = loadSettings();
   createWindows();
   buildMenu();

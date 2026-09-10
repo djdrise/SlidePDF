@@ -1,5 +1,6 @@
 import { loadDoc, SlideView, renderThumb, pageText } from './lib/pdfview.js';
 import { RenderQueue } from './lib/renderqueue.js';
+import { ThumbStore } from './lib/thumbstore.js';
 import { bindKeys, bindDropOpen } from './lib/keys.js';
 
 const $ = (id) => document.getElementById(id);
@@ -64,6 +65,51 @@ const thumbQueue = new RenderQueue(4);
 /** Насколько далеко от видимой области миниатюру ещё имеет смысл рисовать. */
 const NEAR_MARGIN = 600;
 
+/** Готовые миниатюры, переживающие переключение вкладок. */
+const thumbs = new ThumbStore();
+
+/**
+ * Уменьшает готовую канву до ширины миниатюры.
+ *
+ * Уменьшение делается ступенями, вдвое за раз. За один шаг с 1100 пикселей до
+ * 128 браузер берёт слишком редкие отсчёты, и текст выходит грубее, чем у
+ * соседних миниатюр, нарисованных сразу в нужном размере, — на ленте это видно.
+ */
+function scaleCanvas(src, cssWidth) {
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.round(cssWidth * ratio));
+  const height = Math.max(1, Math.round((src.height / src.width) * width));
+
+  let step = src;
+  while (step.width > width * 2) {
+    const half = document.createElement('canvas');
+    half.width = Math.max(width, Math.round(step.width / 2));
+    half.height = Math.max(height, Math.round(step.height / 2));
+    const hctx = half.getContext('2d', { alpha: false });
+    hctx.imageSmoothingQuality = 'high';
+    hctx.drawImage(step, 0, 0, half.width, half.height);
+    step = half;
+  }
+
+  const out = document.createElement('canvas');
+  out.width = width;
+  out.height = height;
+  out.style.width = `${cssWidth}px`;
+  out.style.height = `${Math.round(height / ratio)}px`;
+  const ctx = out.getContext('2d', { alpha: false });
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(step, 0, 0, width, height);
+  return out;
+}
+
+/** Картинка из кэша на диске превращается обратно в канву. */
+async function canvasFromDataUrl(url, cssWidth) {
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  return scaleCanvas(img, cssWidth);
+}
+
 /** Копия канвы: одну и ту же нельзя показать в двух местах разметки. */
 function copyCanvas(src) {
   const out = document.createElement('canvas');
@@ -101,6 +147,7 @@ class ThumbGrid {
     this.container.replaceChildren();
     this.items = [];
     this.pdf = null;
+    this.docId = null;
   }
 
   /** Готовая миниатюра страницы — сетка берёт её как временную заглушку. */
@@ -121,9 +168,10 @@ class ThumbGrid {
     this.jobs.clear();
   }
 
-  build(pdf, count) {
+  build(pdf, count, docId) {
     this.clear();
     this.pdf = pdf;
+    this.docId = docId;
     const frag = document.createDocumentFragment();
     for (let n = 1; n <= count; n++) {
       const btn = document.createElement('button');
@@ -142,6 +190,16 @@ class ThumbGrid {
     }
     this.container.appendChild(frag);
 
+    // Миниатюры, уцелевшие с прошлого показа этой вкладки, ставим сразу:
+    // возврат на вкладку не должен перерисовывать то, что уже нарисовано.
+    for (const el of this.items) {
+      const n = Number(el.dataset.page);
+      const ready = thumbs.get(this.docId, this.width, n);
+      if (!ready) continue;
+      this._place(el, ready);
+      this.done.set(n, ready);
+    }
+
     this.observer = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -152,12 +210,15 @@ class ThumbGrid {
       },
       { root: this.container, rootMargin: '400px' },
     );
-    for (const el of this.items) this.observer.observe(el);
+    for (const el of this.items) {
+      if (!this.done.has(Number(el.dataset.page))) this.observer.observe(el);
+    }
   }
 
   _render(el) {
     const n = Number(el.dataset.page);
     const pdf = this.pdf;
+    const docId = this.docId;
     if (this.jobs.has(n) || this.done.has(n)) return;
 
     // Пока рисуется своя, резкая, показываем растянутую из полосы: сетка
@@ -173,10 +234,19 @@ class ThumbGrid {
             if (this.pdf === pdf) this.observer?.observe(el);
             return;
           }
+
+          // Отрисовать страницу заново — самое дорогое, что тут есть, поэтому
+          // сперва спрашиваем кэш на диске: он переживает перезапуск программы.
+          const cached = await window.deck.thumbGet(docId, n, this.width);
+          if (this.pdf !== pdf || signal.aborted) return;
+          if (cached) {
+            this._adopt(el, n, await canvasFromDataUrl(cached, this.width), { save: false });
+            return;
+          }
+
           const canvas = await renderThumb(pdf, n, this.width, signal);
           if (!canvas || this.pdf !== pdf) return; // отменили или сменили вкладку
-          this._place(el, canvas);
-          this.done.set(n, canvas);
+          this._adopt(el, n, canvas, { save: true });
         } finally {
           if (this.jobs.get(n) === cancel) this.jobs.delete(n);
         }
@@ -185,6 +255,53 @@ class ThumbGrid {
     );
 
     this.jobs.set(n, cancel);
+  }
+
+  /** Есть ли уже готовая миниатюра этой страницы. */
+  has(n) {
+    return this.done.has(n);
+  }
+
+  /**
+   * Ставит готовую миниатюру на место и запоминает её. save говорит, нужно ли
+   * класть картинку в кэш на диске: то, что мы только что оттуда достали,
+   * записывать обратно незачем.
+   */
+  _adopt(el, n, canvas, { save }) {
+    this._place(el, canvas);
+    this.done.set(n, canvas);
+    if (this.docId != null) thumbs.put(this.docId, this.width, n, canvas);
+    if (save && this.docId != null) {
+      // Качество 0.75 хватает для миниатюры, а файл выходит в разы меньше.
+      window.deck.thumbPut(this.docId, n, this.width, canvas.toDataURL('image/jpeg', 0.75));
+    }
+  }
+
+  /**
+   * Забирает уже отрисованный крупный слайд и уменьшает его в миниатюру.
+   *
+   * Насколько сильно уменьшать — вопрос не только скорости. Текст, нарисованный
+   * сразу в мелком размере, чётче любого уменьшения, и при большой разнице это
+   * видно: миниатюра выходит мягче соседних. Поэтому в сетку, где уменьшение
+   * втрое, картинка идёт как есть и второй отрисовки не будет, а в ленту, где
+   * оно почти десятикратное, она ставится лишь как мгновенная подстановка —
+   * очередь потом заменит её резкой.
+   */
+  adopt(n, big) {
+    if (this.done.has(n) || !this.pdf) return;
+    const el = this.items[n - 1];
+    if (!el) return;
+
+    const scaled = scaleCanvas(big, this.width);
+    if (big.width > scaled.width * 3) {
+      this._place(el, scaled); // временная, поверх неё ляжет отрисованная
+      return;
+    }
+
+    this.jobs.get(n)?.();
+    this.jobs.delete(n);
+    this.observer?.unobserve(el);
+    this._adopt(el, n, scaled, { save: true });
   }
 
   /** Ставит картинку на место заглушки или предыдущей, менее чёткой. */
@@ -218,6 +335,16 @@ class ThumbGrid {
     for (const el of this.items) el.classList.toggle('frozen', Number(el.dataset.page) === n);
   }
 }
+
+// Крупный слайд уже отрисован — обе ленты берут из него миниатюру уменьшением,
+// вместо того чтобы гонять pdf.js второй раз ради того же изображения.
+const adoptRendered = (n, canvas, doc) => {
+  if (doc !== activePdf) return;
+  strip.adopt(n, canvas);
+  grid.adopt(n, canvas);
+};
+currentView.onRender = adoptRendered;
+nextView.onRender = adoptRendered;
 
 const strip = new ThumbGrid(els.filmstrip, {
   width: 128,
@@ -333,9 +460,9 @@ function getPdf(id) {
   let promise = cache.get(id);
   if (!promise) {
     promise = (async () => {
-      const payload = await window.deck.docBytes(id);
-      if (!payload) throw new Error('нет данных документа');
-      return loadDoc(payload.bytes);
+      const source = await window.deck.docSource(id);
+      if (!source) throw new Error('нет данных документа');
+      return loadDoc({ id: source.id, length: source.length });
     })();
     cache.set(id, promise);
   }
@@ -348,7 +475,7 @@ function useDoc(id, pdf) {
   lastRenderKey = '';
   currentView.setDoc(pdf);
   nextView.setDoc(pdf);
-  strip.build(pdf, pdf.numPages);
+  strip.build(pdf, pdf.numPages, id);
   grid.clear();
   setSlideAspect(pdf);
   els.overviewTotal.textContent = String(pdf.numPages);
@@ -415,6 +542,7 @@ function pruneCache(st) {
   for (const [id, promise] of cache) {
     if (alive.has(id)) continue;
     cache.delete(id);
+    thumbs.dropDoc(id);
     promise.then((pdf) => pdf.destroy?.()).catch(() => {});
     if (loadedId === id) {
       activePdf = null;
@@ -488,6 +616,8 @@ function renderSlides(s) {
   const key = `${s.activeId}:${page}`;
   if (key === lastRenderKey) return;
   lastRenderKey = key;
+  // Слайд важнее миниатюр: они уступают воркер на время его отрисовки.
+  thumbQueue.pause(250);
 
   currentView.show(page);
   if (page < activePdf.numPages) {
@@ -520,7 +650,7 @@ function openOverview() {
   const doc = state?.docs.find((d) => d.id === state.activeId);
   overviewSel = doc?.page || 1;
   els.overview.hidden = false;
-  if (!grid.items.length) grid.build(activePdf, activePdf.numPages);
+  if (!grid.items.length) grid.build(activePdf, activePdf.numPages, loadedId);
   grid.setCurrent(overviewSel, { cls: 'selected' });
 }
 

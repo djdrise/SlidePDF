@@ -18,6 +18,8 @@ export class RenderQueue {
     this.pending = [];
     this.active = new Set();
     this.seq = 0;
+    /** До какого момента не начинать новые задачи, см. pause(). */
+    this.until = 0;
   }
 
   /**
@@ -37,6 +39,16 @@ export class RenderQueue {
     };
   }
 
+  /**
+   * Придерживает очередь: новые задачи не стартуют, пока не пройдёт срок.
+   * Нужно на смене слайда — зал должен получить страницу первым, а миниатюры
+   * подождут пару десятых секунды, этого никто не заметит.
+   */
+  pause(ms) {
+    this.until = Math.max(this.until || 0, Date.now() + ms);
+    setTimeout(() => this._pump(), ms + 5);
+  }
+
   /** Снимает всё, что не начато, и прерывает то, что уже идёт. */
   cancelAll() {
     for (const item of this.pending) item.ctrl.abort();
@@ -45,6 +57,7 @@ export class RenderQueue {
   }
 
   _pump() {
+    if (this.until && Date.now() < this.until) return;
     while (this.active.size < this.limit && this.pending.length) {
       const item = this.pending.splice(this._next(), 1)[0];
       if (item.ctrl.signal.aborted) continue;
