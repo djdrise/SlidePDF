@@ -1,6 +1,6 @@
 {
   "name": "slidepdf",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Cross-platform PDF viewer for conference talks: projector output and a presenter view",
   "main": "src/main/main.js",
   "author": {
