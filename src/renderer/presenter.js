@@ -1,7 +1,7 @@
 import { loadDoc, SlideView, renderThumb, pageText } from './lib/pdfview.js';
 import { RenderQueue } from './lib/renderqueue.js';
 import { ThumbStore } from './lib/thumbstore.js';
-import { bindKeys, bindDropOpen } from './lib/keys.js';
+import { bindKeys, bindDropOpen, bindWheel } from './lib/keys.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -717,6 +717,7 @@ bindKeys((key, e) => {
 });
 
 bindDropOpen();
+bindWheel();
 
 $('btn-open').addEventListener('click', () => window.deck.cmd('open'));
 $('btn-fullscreen').addEventListener('click', () => window.deck.cmd('audience:toggleFullscreen'));

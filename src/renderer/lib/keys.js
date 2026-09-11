@@ -85,6 +85,46 @@ export function bindKeys(onLocal) {
   });
 }
 
+/**
+ * Листание колесом мыши.
+ *
+ * Порог нужен из-за трекпада: он сыплет десятками мелких событий там, где
+ * мышь даёт один щелчок, и без накопления один жест пролистал бы полдоклада.
+ * Пауза после перехода добивает ту же беду с другой стороны: у трекпада
+ * события продолжают идти по инерции уже после того, как палец убрали.
+ */
+const WHEEL_STEP = 50;
+const WHEEL_QUIET = 250;
+
+/** Над чем колесо листает содержимое, а не слайды. */
+const SCROLLABLE = '.filmstrip, .notes-body, .overview-grid, .modal, .display-list';
+
+export function bindWheel() {
+  let acc = 0;
+  let quietUntil = 0;
+
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      if (e.ctrlKey || e.metaKey) return; // масштабирование, не листание
+      if (e.target instanceof Element && e.target.closest(SCROLLABLE)) return;
+
+      const now = Date.now();
+      if (now < quietUntil) {
+        acc = 0; // инерция после перехода — не листаем дальше
+        return;
+      }
+      acc += e.deltaY;
+      if (Math.abs(acc) < WHEEL_STEP) return;
+
+      window.deck.cmd(acc > 0 ? 'next' : 'prev');
+      acc = 0;
+      quietUntil = now + WHEEL_QUIET;
+    },
+    { passive: true },
+  );
+}
+
 /** Открытие PDF перетаскиванием в окно — сразу несколькими файлами. */
 export function bindDropOpen() {
   window.addEventListener('dragover', (e) => {

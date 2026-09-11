@@ -80,6 +80,37 @@ test('несуществующих окон план не касается', () 
   assert.equal(r.audience, 'keep');
 });
 
+test('ручной выбор экрана показа не двигает окно лектора', () => {
+  // Настройка отвечает только за показ: окно лектора остаётся там, где стояло,
+  // даже если экран показа сменился на соседний.
+  const r = plan({
+    audiencePinned: true,
+    presenterDisplayId: 1,
+    presenterOn: 1,
+    audienceDisplayId: 2,
+    audienceOn: 1,
+    showing: false,
+  });
+  assert.equal(r.presenter, 'keep');
+  assert.equal(r.presenterDisplayId, 1);
+  assert.equal(r.audienceDisplayId, 2);
+});
+
+test('показ можно назначить на тот же экран, где сидит лектор', () => {
+  // Выбор лектора важнее автоматики: она бы развела окна по разным экранам.
+  const r = plan({
+    audiencePinned: true,
+    presenterDisplayId: 1,
+    presenterOn: 1,
+    audienceDisplayId: 1,
+    audienceOn: 1,
+    showing: false,
+  });
+  assert.equal(r.presenter, 'keep');
+  assert.equal(r.audienceDisplayId, 1);
+  assert.equal(r.presenterDisplayId, 1);
+});
+
 test('centeredBounds центрирует прямоугольник в рабочей области', () => {
   assert.deepEqual(centeredBounds({ x: 0, y: 0, width: 1000, height: 800 }, 0.5), {
     x: 250,

@@ -1,5 +1,5 @@
 import { loadDoc, SlideView } from './lib/pdfview.js';
-import { bindKeys, bindDropOpen } from './lib/keys.js';
+import { bindKeys, bindDropOpen, bindWheel } from './lib/keys.js';
 
 const stage = document.getElementById('stage');
 const blank = document.getElementById('blank');
@@ -141,6 +141,7 @@ window.deck.getState().then(applyState);
 
 bindKeys();
 bindDropOpen();
+bindWheel();
 
 document.getElementById('bar-close').addEventListener('click', () => window.close());
 

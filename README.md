@@ -163,6 +163,9 @@ again two seconds after the mouse stops moving.
 | <kbd>O</kbd> | open a PDF |
 | <kbd>Esc</kbd> | close the grid, clear the black screen, end the show |
 
+Slides also advance with the mouse wheel, in both windows. Over the filmstrip,
+the slide text and the grid, the wheel scrolls their content instead.
+
 Both windows listen for keys, so a presenter remote (which sends
 PageUp/PageDown) works no matter which window has focus. The layout also
 recognises the Cyrillic letters on the same physical keys.

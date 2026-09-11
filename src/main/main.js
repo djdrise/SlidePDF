@@ -9,6 +9,7 @@ const { planLayout, centeredBounds } = require('./lib/layout');
 const { thumbKey, overBudget } = require('./lib/thumbcache');
 
 const IS_MAC = process.platform === 'darwin';
+const IS_DEV = process.argv.includes('--dev');
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
 const RENDERER = path.join(__dirname, '..', 'renderer');
 // На macOS иконку окна берёт бандл, здесь она нужна Windows и Linux.
@@ -345,7 +346,7 @@ function createWindows() {
     broadcast();
   });
 
-  if (process.argv.includes('--dev')) {
+  if (IS_DEV) {
     for (const win of [presenterWin, audienceWin]) {
       const tag = win === presenterWin ? 'presenter' : 'audience';
       win.webContents.on('console-message', (...args) => {
@@ -574,9 +575,13 @@ const commands = {
 
     state.audienceDisplayId = target;
     state.audiencePinned = true;
-    // Лектору отдаём любой другой экран; если он один — оба окна на нём.
-    const other = screen.getAllDisplays().find((d) => d.id !== target);
-    state.presenterDisplayId = other ? other.id : target;
+    // Окно лектора не трогаем: настройка отвечает только за то, куда уйдёт
+    // показ. Раньше выбор экрана заодно перекидывал и основное окно на
+    // соседний монитор — лектор этого не просил, а рабочее место уезжало.
+    // Записываем за ним тот экран, где оно сейчас стоит: иначе раскладка
+    // сочтёт, что окно не на месте, и подвинет его — с тем же результатом.
+    const presenterNow = displayIdOf(presenterWin);
+    if (presenterNow !== null) state.presenterDisplayId = presenterNow;
 
     if (wasShowing) enterPresentationFullscreen(audienceWin, display);
     applyDisplayLayout();
@@ -784,9 +789,12 @@ function buildMenu() {
       label: 'Окна',
       submenu: [
         { label: 'Показать/скрыть окно зрителей', click: send('audience:toggleVisible') },
-        { type: 'separator' },
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
+        // Перезагрузка и инструменты разработчика — только при запуске с --dev.
+        // Лектору они не нужны, а случайный Ctrl+R посреди доклада перезагрузил
+        // бы окно вместе с открытой презентацией.
+        ...(IS_DEV
+          ? [{ type: 'separator' }, { role: 'reload' }, { role: 'toggleDevTools' }]
+          : []),
       ],
     },
   ];
